@@ -82,7 +82,7 @@
             xref: 'paper',
             yref: 'paper',
             x: 1,
-            y: yOffset || -0.30,
+            y: yOffset || -0.28,
             xanchor: 'right',
             yanchor: 'top',
             showarrow: false,
@@ -437,14 +437,14 @@
         }
         const yBuffer = Math.max(yMax * 0.03, 0.1);
 
-        const height = compact ? 340 : 470;
+        const height = compact ? 340 : 500;
         const yAxisLabel = showPct ? '% of Appropriation Obligated' : 'Cumulative Obligations ($B)';
         const detailSubtitle = showPct
             ? 'Cumulative obligations as a percentage of full-year appropriations.'
             : 'Cumulative obligations in billions of dollars by fiscal year month.';
         const detailTitle = agency.display_name + ' \u2014 Obligation Spend-Down'
             + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
-        const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133", -0.30)];
+        const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")];
         annotations.push(...obligationMonthLabels(compact));
 
         const layout = {
@@ -496,8 +496,8 @@
             margin: {
                 l: compact ? 45 : 60,
                 r: 12,
-                t: compact ? 38 : 62,
-                b: compact ? 65 : 95,
+                t: compact ? 38 : 72,
+                b: compact ? 65 : 110,
             },
             annotations: annotations,
         };
@@ -656,6 +656,42 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = agencyKey + '_obligations.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    function initAwardsExport() {
+        document.getElementById('btn-awards-download-png').addEventListener('click', () => {
+            const agencyKey = document.getElementById('awards-agency-select').value;
+            Plotly.downloadImage(document.getElementById('chart-awards-detail'), {
+                format: 'png',
+                width: 1200,
+                height: 600,
+                scale: 2,
+                filename: agencyKey + '_awards',
+            });
+        });
+
+        document.getElementById('btn-awards-download-csv').addEventListener('click', () => {
+            const agencyKey = document.getElementById('awards-agency-select').value;
+            const agencyAwards = DATA.awards[agencyKey];
+            if (!agencyAwards) return;
+
+            let csv = 'fiscal_year,fy_day,cumulative_count,cumulative_dollars_m\n';
+            for (const [fy, yearData] of Object.entries(agencyAwards.years)) {
+                for (let i = 0; i < yearData.fy_days.length; i++) {
+                    const count = yearData.cumulative_count ? yearData.cumulative_count[i] : '';
+                    const dollars = yearData.cumulative_dollars_m ? yearData.cumulative_dollars_m[i] : '';
+                    csv += `${fy},${yearData.fy_days[i]},${count},${dollars}\n`;
+                }
+            }
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = agencyKey + '_awards.csv';
             a.click();
             URL.revokeObjectURL(url);
         });
@@ -1195,9 +1231,9 @@
         }
         const yBufferAward = Math.max(yMaxAward * 0.03, 0.01);
 
-        const height = compact ? 340 : 470;
+        const height = compact ? 340 : 500;
         const sourceLabel = SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type;
-        const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel, -0.30)];
+        const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel)];
 
         const awardYLabel = isPct ? '% of Appropriation Awarded' : isDollars ? 'Cumulative Awards ($M)' : 'Cumulative Award Count';
         const awardsDetailSubtitle = mode === 'counts'
@@ -1256,8 +1292,8 @@
             margin: {
                 l: compact ? 45 : 60,
                 r: 12,
-                t: compact ? 38 : 62,
-                b: compact ? 65 : 95,
+                t: compact ? 38 : 72,
+                b: compact ? 65 : 110,
             },
             annotations: awardAnnotations,
         };
@@ -1405,13 +1441,6 @@
             toggleContainer.style.display = hasCounts ? '' : 'none';
         }
 
-        // Source badge
-        const badge = document.getElementById('awards-source-badge');
-        if (badge && agencyAwards) {
-            const sourceLabel = SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type;
-            badge.textContent = 'Data source: ' + sourceLabel;
-        }
-
         renderAwardsMetrics(agencyKey);
         renderAwardsCumulativeChart(agencyKey, 'chart-awards-detail', mode, false);
     }
@@ -1471,6 +1500,7 @@
         initDataSectionToggle();
         initAgencySelect();
         initExport();
+        initAwardsExport();
         renderDataBadge();
         renderMultiAgencyChart();
         renderSmallMultiples();
