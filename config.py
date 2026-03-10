@@ -120,3 +120,78 @@ CURRENT_FY = 2026
 HIGHLIGHT_YEARS = [2026, 2025]
 # Years that go into the prior-year range band (excludes current + highlighted)
 BAND_YEARS_EXCLUDE = {2026, 2025}
+
+
+# ---------------------------------------------------------------------------
+# Awards Pipeline
+# ---------------------------------------------------------------------------
+
+AWARDS_FISCAL_YEARS = list(range(2016, 2027))
+
+# NIH Reporter API
+NIH_REPORTER_URL = "https://api.reporter.nih.gov/v2/projects/search"
+NIH_REPORTER_RATE_LIMIT = 1.0  # seconds between requests
+NIH_REPORTER_PAGE_SIZE = 500
+NIH_REPORTER_MAX_OFFSET = 14999
+NIH_COMPETING_TYPES = ["1", "2"]  # Type 1 (New) + Type 2 (Competing Renewal)
+
+# NIH IC abbreviations — used to partition queries and stay under API limits
+NIH_IC_CODES = [
+    "NCI", "NHLBI", "NIDCR", "NIDDK", "NINDS", "NIAID", "NIGMS",
+    "NICHD", "NEI", "NIEHS", "NIA", "NIAMS", "NIDCD", "NIMH",
+    "NIDA", "NIAAA", "NINR", "NHGRI", "NIBIB", "NIMHD", "NCCIH",
+    "NCATS", "NLM", "FIC", "CIT", "CSR", "OD",
+]
+
+# NSF Awards API
+NSF_AWARDS_URL = "https://api.nsf.gov/services/v1/awards.json"
+NSF_PAGE_SIZE = 25
+NSF_MAX_RESULTS = 3000
+# Research & Related directorate CFDAs (excludes EDU, TIP, etc.)
+NSF_RESEARCH_CFDAS = [
+    "47.041", "47.049", "47.050", "47.070", "47.074", "47.075",
+]
+
+# USASpending API
+USASPENDING_TIME_URL = (
+    "https://api.usaspending.gov/api/v2/search/spending_over_time/"
+)
+USASPENDING_AWARD_TYPE_CODES = ["04", "05"]  # Project grants + Cooperative agreements
+
+# Per-agency awards configuration
+AWARDS_CONFIG = {
+    "NIH": {
+        "source": "nih_reporter",
+        "metric_label": "New & Competing Awards",
+        "metric_label_short": "Awards",
+    },
+    "NSF": {
+        "source": "nsf_awards",
+        "metric_label": "New Awards",
+        "metric_label_short": "Awards",
+    },
+    "DOE_SC": {
+        "source": "usaspending",
+        "metric_label": "New Grant Awards",
+        "metric_label_short": "Awards",
+        "cfda": ["81.049"],
+        "agency_name": "Department of Energy",
+        "agency_tier": "toptier",
+    },
+    "NASA_SCI": {
+        "source": "usaspending",
+        "metric_label": "New Grant Awards",
+        "metric_label_short": "Awards",
+        "cfda": ["43.001", "43.013"],
+        "agency_name": "National Aeronautics and Space Administration",
+        "agency_tier": "toptier",
+    },
+    "USDA_RD": {
+        "source": "usaspending",
+        "metric_label": "New Grant Awards",
+        "metric_label_short": "Awards",
+        "cfda": ["10.310"],
+        "agency_name": "Department of Agriculture",
+        "agency_tier": "toptier",
+    },
+}

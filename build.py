@@ -16,9 +16,13 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import AGENCIES, CURRENT_FY, HIGHLIGHT_YEARS, BAND_YEARS_EXCLUDE, FY_MONTH_LABELS
+from config import (
+    AGENCIES, AWARDS_CONFIG, CURRENT_FY, HIGHLIGHT_YEARS,
+    BAND_YEARS_EXCLUDE, FY_MONTH_LABELS,
+)
 
 PROCESSED_DIR = Path(__file__).resolve().parent / "data" / "processed"
+AWARDS_PROCESSED_DIR = Path(__file__).resolve().parent / "awards" / "processed"
 SITE_DATA_DIR = Path(__file__).resolve().parent / "docs" / "data"
 
 
@@ -41,7 +45,7 @@ def build_agency_configs():
 
 
 def compute_prior_year_envelope(agency_data, fiscal_years, show_pct=True):
-    """Compute min/max/median band from band-eligible fiscal years."""
+    """Compute min/max/mean band from band-eligible fiscal years."""
     band_fys = [fy for fy in fiscal_years if fy not in BAND_YEARS_EXCLUDE]
     if not band_fys:
         return None
@@ -67,7 +71,7 @@ def compute_prior_year_envelope(agency_data, fiscal_years, show_pct=True):
         if vals:
             min_vals.append(round(min(vals), 3))
             max_vals.append(round(max(vals), 3))
-            med_vals.append(round(float(np.median(vals)), 3))
+            med_vals.append(round(float(np.mean(vals)), 3))
         else:
             min_vals.append(None)
             max_vals.append(None)
@@ -77,15 +81,15 @@ def compute_prior_year_envelope(agency_data, fiscal_years, show_pct=True):
         "months": all_months,
         "min": min_vals,
         "max": max_vals,
-        "median": med_vals,
+        "mean": med_vals,
         "band_fys": band_fys,
     }
 
 
-def compute_median_lookup(agency_data, fiscal_years, show_pct=True):
-    """Build {month: median_value} from band-eligible years."""
+def compute_mean_lookup(agency_data, fiscal_years, show_pct=True):
+    """Build {month: mean_value} from band-eligible years."""
     band_fys = [fy for fy in fiscal_years if fy not in BAND_YEARS_EXCLUDE]
-    medians = {}
+    means = {}
     y_col = "pct_obligated" if show_pct else "obligations"
     for m in range(1, 13):
         vals = []
@@ -102,8 +106,8 @@ def compute_median_lookup(agency_data, fiscal_years, show_pct=True):
                     v = v / 1e9
                 vals.append(v)
         if vals:
-            medians[str(m)] = round(float(np.median(vals)), 3)
-    return medians
+            means[str(m)] = round(float(np.mean(vals)), 3)
+    return means
 
 
 def build_spenddown_data(obligation_series):
@@ -168,26 +172,26 @@ def build_multi_agency_data(obligation_series):
         if agency_fy.empty:
             continue
 
-        medians = compute_median_lookup(agency_all, all_fys, show_pct=True)
+        means = compute_mean_lookup(agency_all, all_fys, show_pct=True)
 
         x_vals = [1]
         y_vals = [100.0]
 
         for _, row in agency_fy.iterrows():
             m = row["period_month"]
-            med = medians.get(str(int(m)))
+            avg = means.get(str(int(m)))
             curr_pct = row["pct_obligated"]
-            if med and med > 0 and curr_pct is not None:
-                pct_of_median = curr_pct / med * 100
+            if avg and avg > 0 and curr_pct is not None:
+                pct_of_mean = curr_pct / avg * 100
             else:
-                pct_of_median = None
-            if pct_of_median is not None:
+                pct_of_mean = None
+            if pct_of_mean is not None:
                 x_vals.append(int(m))
-                y_vals.append(round(pct_of_median, 2))
+                y_vals.append(round(pct_of_mean, 2))
 
         traces[agency_key] = {
             "months": x_vals,
-            "pct_of_median": y_vals,
+            "pct_of_mean": y_vals,
         }
 
     return traces
@@ -248,6 +252,300 @@ def build_data_tables(approp_summary, yoy_comparison):
     return {"approp_summary": approp_records, "yoy_comparison": yoy_records}
 
 
+def _load_approp_lookup():
+    """Build {agency: {fy: approp_dollars}} from SF-133 approp_summary."""
+    approp_path = PROCESSED_DIR / "approp_summary.csv"
+    if not approp_path.exists():
+        return {}
+    approp = pd.read_csv(approp_path)
+    lookup = {}
+    for _, row in approp.iterrows():
+        agency = row["agency"]
+        fy = int(row["fiscal_year"])
+        # Use discretionary appropriation (Line 1100) as denominator.
+        # Mandatory (Line 1200) is excluded because it appears inconsistently
+        # across agencies and years, which would distort cross-year comparisons.
+        val = row.get("approp_disc_raw")
+        if pd.notna(val) and val > 0:
+            lookup.setdefault(agency, {})[fy] = float(val)
+    return lookup
+
+
+def _detect_reliable_years(agency_series, fiscal_years, current_fy):
+    """Auto-exclude years with implausibly low grant totals (bad USASpending data)."""
+    fy_totals = {}
+    for fy in fiscal_years:
+        if fy == current_fy:
+            continue
+        fy_data = agency_series[agency_series["fiscal_year"] == fy]
+        if not fy_data.empty:
+            fy_totals[fy] = fy_data["cumulative_dollars"].max()
+
+    if not fy_totals:
+        return fiscal_years
+
+    peak = max(fy_totals.values())
+    if peak <= 0:
+        return fiscal_years
+
+    threshold = peak * 0.25
+    return [fy for fy in fiscal_years if fy == current_fy or fy_totals.get(fy, 0) >= threshold]
+
+
+def build_awards_site_data():
+    """Build awards chart data from awards/processed/ CSVs if available."""
+    series_path = AWARDS_PROCESSED_DIR / "award_series.csv"
+    summary_path = AWARDS_PROCESSED_DIR / "award_summary.csv"
+
+    if not series_path.exists():
+        print("No awards data found — skipping awards build.")
+        return {}, {}
+
+    print("Loading awards CSVs...")
+    series = pd.read_csv(series_path)
+    summary_df = pd.read_csv(summary_path) if summary_path.exists() else pd.DataFrame()
+    approp_lookup = _load_approp_lookup()
+
+    awards_data = {}
+    for agency_key in AWARDS_CONFIG:
+        agency_series = series[series["agency"] == agency_key]
+        if agency_series.empty:
+            continue
+
+        acfg = AWARDS_CONFIG[agency_key]
+        fiscal_years = sorted(agency_series["fiscal_year"].unique())
+
+        # Auto-exclude years with bad data
+        reliable_years = _detect_reliable_years(agency_series, fiscal_years, CURRENT_FY)
+        excluded_years = [fy for fy in fiscal_years if fy not in reliable_years]
+        if excluded_years:
+            print(f"  {agency_key}: excluding {excluded_years} (incomplete USASpending data)")
+
+        band_fys = [fy for fy in reliable_years
+                    if fy not in BAND_YEARS_EXCLUDE and fy != CURRENT_FY]
+
+        # Get appropriation lookup for this agency
+        agency_approp = approp_lookup.get(agency_key, {})
+
+        # Build year traces — always anchor at fy_day=1 with value 0
+        year_traces = {}
+        for fy in reliable_years:
+            fy_data = agency_series[agency_series["fiscal_year"] == fy].sort_values("fy_day")
+            if fy_data.empty:
+                continue
+
+            fy_days = fy_data["fy_day"].tolist()
+            dates = fy_data["date"].tolist()
+            counts = fy_data["cumulative_count"].tolist()
+            dollars_list = fy_data["cumulative_dollars"].tolist()
+
+            # Prepend Oct 1 anchor if series doesn't start there
+            if fy_days[0] != 1:
+                fy_start_date = f"{fy - 1}-10-01"
+                fy_days = [1] + fy_days
+                dates = [fy_start_date] + dates
+                counts = [0] + counts
+                dollars_list = [0.0] + dollars_list
+
+            dollars_m = [round(v / 1e6, 2) for v in dollars_list]
+
+            # Compute pct of appropriation if available
+            approp_val = agency_approp.get(fy)
+            if approp_val and approp_val > 0:
+                pct_approp = [round(v / approp_val * 100, 3) for v in dollars_list]
+            else:
+                pct_approp = [None] * len(dollars_list)
+
+            year_traces[str(fy)] = {
+                "fy_days": fy_days,
+                "dates": dates,
+                "cumulative_count": counts,
+                "cumulative_dollars_m": dollars_m,
+                "pct_of_approp": pct_approp,
+            }
+
+        # Anchor all series at fy_day=1 with value 0 before envelope computation
+        anchored_frames = []
+        for fy in reliable_years:
+            fy_data = agency_series[agency_series["fiscal_year"] == fy].sort_values("fy_day")
+            if fy_data.empty:
+                continue
+            if fy_data["fy_day"].iloc[0] != 1:
+                anchor = fy_data.iloc[:1].copy()
+                anchor["fy_day"] = 1
+                anchor["date"] = f"{fy - 1}-10-01"
+                anchor["cumulative_count"] = 0
+                anchor["cumulative_dollars"] = 0.0
+                fy_data = pd.concat([anchor, fy_data], ignore_index=True)
+            anchored_frames.append(fy_data)
+        anchored_series = pd.concat(anchored_frames, ignore_index=True) if anchored_frames else agency_series
+
+        # Add pct_of_approp to series for envelope computation
+        pct_records = []
+        for fy in band_fys:
+            approp_val = agency_approp.get(fy)
+            if not approp_val or approp_val <= 0:
+                continue
+            fy_data = anchored_series[anchored_series["fiscal_year"] == fy].copy()
+            fy_data["pct_of_approp"] = fy_data["cumulative_dollars"] / approp_val * 100
+            pct_records.append(fy_data)
+
+        pct_band_fys = [fy for fy in band_fys if agency_approp.get(fy, 0) > 0]
+
+        if pct_records:
+            pct_series = pd.concat(pct_records, ignore_index=True)
+            envelope_pct = _build_awards_envelope(pct_series, pct_band_fys, "pct_of_approp")
+        else:
+            envelope_pct = None
+
+        # Also build dollar and count envelopes from reliable years only
+        reliable_anchored = anchored_series[anchored_series["fiscal_year"].isin(reliable_years)]
+        envelope_count = _build_awards_envelope(reliable_anchored, band_fys, "cumulative_count")
+        envelope_dollars = _build_awards_envelope(reliable_anchored, band_fys, "cumulative_dollars", scale=1e6)
+
+        awards_data[agency_key] = {
+            "source_type": acfg["source"],
+            "metric_label": acfg["metric_label"],
+            "fiscal_years": [fy for fy in fiscal_years if fy in reliable_years],
+            "years": year_traces,
+            "envelope_count": envelope_count,
+            "envelope_dollars": envelope_dollars,
+            "envelope_pct": envelope_pct,
+        }
+
+    # Build summary
+    awards_summary = {}
+    if not summary_df.empty:
+        for _, row in summary_df.iterrows():
+            agency = row["agency"]
+            rec = {}
+            for col in summary_df.columns:
+                v = row[col]
+                if pd.isna(v):
+                    rec[col] = None
+                elif isinstance(v, (np.floating, np.integer)):
+                    rec[col] = round(float(v), 2)
+                else:
+                    rec[col] = v
+
+            # Add appropriation for context
+            agency_approp = approp_lookup.get(agency, {})
+            approp_val = agency_approp.get(CURRENT_FY)
+            if approp_val:
+                rec["appropriation"] = round(approp_val, 2)
+
+            # Compute pct_of_approp fields for normalized comparisons
+            latest_day = rec.get("latest_fy_day")
+            cumul_dollars = rec.get("cumul_dollars")
+
+            # Current FY: cumulative $ as % of appropriation
+            if approp_val and approp_val > 0 and cumul_dollars is not None:
+                rec["cumul_pct_approp"] = round(cumul_dollars / approp_val * 100, 3)
+            else:
+                rec["cumul_pct_approp"] = None
+
+            # Prior FY: prior year $ at same day as % of prior year appropriation
+            prior_approp = agency_approp.get(CURRENT_FY - 1)
+            prior_dollars = rec.get("prior_year_dollars")
+            if prior_approp and prior_approp > 0 and prior_dollars is not None:
+                rec["prior_year_pct_approp"] = round(prior_dollars / prior_approp * 100, 3)
+            else:
+                rec["prior_year_pct_approp"] = None
+
+            # Mean pct_of_approp across band years at same fy_day.
+            # Uses linear interpolation to handle leap-year day offsets,
+            # matching the envelope computation.
+            agency_series_for_mean = series[series["agency"] == agency]
+            reliable = _detect_reliable_years(
+                agency_series_for_mean,
+                sorted(agency_series_for_mean["fiscal_year"].unique()),
+                CURRENT_FY,
+            )
+            band = [
+                fy for fy in reliable
+                if fy not in BAND_YEARS_EXCLUDE and fy != CURRENT_FY
+            ]
+            pct_vals = []
+            for fy in band:
+                fy_approp = agency_approp.get(fy)
+                if not fy_approp or fy_approp <= 0:
+                    continue
+                fy_data = agency_series_for_mean[
+                    agency_series_for_mean["fiscal_year"] == fy
+                ].sort_values("fy_day")
+                if fy_data.empty:
+                    continue
+                days = fy_data["fy_day"].values
+                dollars = fy_data["cumulative_dollars"].values
+                if latest_day < days[0]:
+                    continue
+                interp_dollars = float(np.interp(latest_day, days, dollars))
+                pct_vals.append(interp_dollars / fy_approp * 100)
+
+            if pct_vals:
+                rec["mean_pct_approp"] = round(float(np.mean(pct_vals)), 4)
+            else:
+                rec["mean_pct_approp"] = None
+
+            awards_summary[agency] = rec
+
+    return awards_data, awards_summary
+
+
+def _build_awards_envelope(agency_series, band_fys, y_col, scale=1):
+    """Compute min/max/mean envelope for awards data.
+
+    For each year, linearly interpolates onto a common grid of fy_days
+    so that leap-year vs non-leap-year differences don't create
+    stair-step artifacts in monthly data.
+    """
+    if not band_fys:
+        return None
+
+    # Build per-FY sorted arrays of (fy_day, value)
+    fy_arrays = {}
+    for fy in band_fys:
+        fy_data = agency_series[agency_series["fiscal_year"] == fy].sort_values("fy_day")
+        if fy_data.empty:
+            continue
+        days = fy_data["fy_day"].values
+        vals = fy_data[y_col].values / scale if scale != 1 else fy_data[y_col].values
+        fy_arrays[fy] = (days, vals)
+
+    if not fy_arrays:
+        return None
+
+    # Use the fy_days from the year with the most points as the canonical grid
+    canonical_fy = max(fy_arrays, key=lambda fy: len(fy_arrays[fy][0]))
+    sample_days = list(fy_arrays[canonical_fy][0])
+
+    valid_days, min_vals, max_vals, med_vals = [], [], [], []
+    for day in sample_days:
+        vals = []
+        for fy, (days, values) in fy_arrays.items():
+            # Linear interpolation at this day
+            if day <= days[0]:
+                vals.append(float(values[0]))
+            elif day >= days[-1]:
+                vals.append(float(values[-1]))
+            else:
+                v = float(np.interp(day, days, values))
+                vals.append(v)
+        if vals:
+            valid_days.append(int(day))
+            min_vals.append(round(min(vals), 4))
+            max_vals.append(round(max(vals), 4))
+            med_vals.append(round(float(np.mean(vals)), 4))
+
+    return {
+        "fy_days": valid_days,
+        "min": min_vals,
+        "max": max_vals,
+        "mean": med_vals,
+        "band_fys": band_fys,
+    }
+
+
 def main():
     print("Loading preprocessed CSVs...")
     obligation_series, approp_summary, yoy_comparison = load_csvs()
@@ -259,6 +557,9 @@ def main():
         latest_period_label = FY_MONTH_LABELS.get(latest_month, f"Month {latest_month}")
     else:
         latest_period_label = None
+
+    # Load awards data if available
+    awards_data, awards_summary_data = build_awards_site_data()
 
     print("Building chart data...")
     site_data = {
@@ -276,6 +577,12 @@ def main():
         "summaries": build_summary_data(obligation_series, approp_summary),
         "tables": build_data_tables(approp_summary, yoy_comparison),
     }
+
+    # Add awards data if available
+    if awards_data:
+        site_data["awards"] = awards_data
+    if awards_summary_data:
+        site_data["awards_summary"] = awards_summary_data
 
     SITE_DATA_DIR.mkdir(parents=True, exist_ok=True)
     out_path = SITE_DATA_DIR / "site_data.json"

@@ -137,9 +137,9 @@ def compute_yoy_comparison(
             ]
             prior_pct = prior_same["pct_obligated"].iloc[0] if not prior_same.empty else None
 
-            # Median spend-down rate across all prior years at same month
+            # Mean spend-down rate across all prior years at same month
             prior_all = prior[prior["period_month"] == month]["pct_obligated"]
-            median_pct = prior_all.median() if not prior_all.empty else None
+            median_pct = prior_all.mean() if not prior_all.empty else None
 
             yoy_diff = (curr_pct - prior_pct) if prior_pct is not None else None
 

@@ -623,6 +623,16 @@ body {
     font-size: 0.68rem;
 }
 
+/* ── Source Badge ── */
+.source-badge {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    color: var(--color-text-faint);
+    margin-top: 1rem;
+    padding: 0.4rem 0;
+    letter-spacing: 0.01em;
+}
+
 /* ── Focus Visible (global) ── */
 :focus-visible {
     outline: 2px solid var(--color-accent);

@@ -15,12 +15,14 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import AGENCIES, CURRENT_FY, FY_MONTH_LABELS
+from config import AGENCIES, AWARDS_CONFIG, CURRENT_FY, FY_MONTH_LABELS
 from data.transform import get_latest_period
 from charts.spenddown import plotly_spenddown, plotly_multi_agency
 from charts.summary import compute_agency_summary, format_dollars, format_pct
+from charts.awards import plotly_awards_cumulative, plotly_awards_multi
 
 PROCESSED_DIR = Path(__file__).resolve().parent / "data" / "processed"
+AWARDS_PROCESSED_DIR = Path(__file__).resolve().parent / "awards" / "processed"
 
 st.set_page_config(
     page_title="Science R&D Spend-Down Tracker",

@@ -16,7 +16,7 @@
         <header class="site-header">
             <div class="header-inner">
                 <h1 class="site-title">Science Spend-Down</h1>
-                <p class="site-subtitle">Federal agencies obligate tens of billions in science funding each year on a predictable schedule. When that pace breaks from its historical pattern, it tells us something important about the state of the research enterprise. This tracker follows obligation rates at five major science agencies using OMB budget execution data.</p>
+                <p class="site-subtitle">Federal agencies spend tens of billions on science each year on a predictable schedule. When that pace breaks from its historical pattern, it tells us something important about the state of the research enterprise. This tracker follows both total obligation rates and new award activity at five major science agencies.</p>
                 <div class="data-badge" id="data-badge"></div>
             </div>
         </header>
@@ -24,19 +24,23 @@
         <!-- Navigation -->
         <nav class="tab-nav" role="tablist" aria-label="Main navigation">
             <div class="container">
-                <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="tab-overview">Overview</button>
-                <button class="tab-btn" data-tab="agency" role="tab" aria-selected="false" aria-controls="tab-agency">Agency Detail</button>
-                <button class="tab-btn" data-tab="data" role="tab" aria-selected="false" aria-controls="tab-data">Data</button>
+                <button class="tab-btn active" data-tab="obligations" role="tab" aria-selected="true" aria-controls="tab-obligations">Obligations</button>
+                <button class="tab-btn" data-tab="awards" role="tab" aria-selected="false" aria-controls="tab-awards">New Awards</button>
+                <button class="tab-btn" data-tab="data" role="tab" aria-selected="false" aria-controls="tab-data">Data &amp; Methods</button>
             </div>
         </nav>
 
         <!-- Main Content -->
         <main class="container">
-            <!-- Overview Tab -->
-            <section id="tab-overview" class="tab-panel active" role="tabpanel">
+            <!-- Obligations Tab -->
+            <section id="tab-obligations" class="tab-panel active" role="tabpanel">
+                <div class="callout">
+                    <strong>What this tracks.</strong> Obligations are binding commitments to spend federal funds&mdash;the broadest measure of spending activity. This tab shows <em>total</em> obligations at each agency, including grants, contracts, salaries, and continuations. Because it captures all spending, the obligation pace is slow to reflect disruptions to new research funding specifically. See the <strong>New Awards</strong> tab for that view.
+                </div>
+
                 <div class="chart-header">
                     <h3 class="chart-title" id="overview-chart-title"></h3>
-                    <p class="chart-subtitle">Each line shows how an agency's current obligation rate compares to its historical median. A value below 100% means the agency has obligated less than it typically would have by that point in the fiscal year.</p>
+                    <p class="chart-subtitle">Each line shows how an agency's current obligation rate compares to its historical mean. A value below 100% means the agency has obligated less than it typically would have by that point in the fiscal year.</p>
                 </div>
 
                 <div class="chart-wide">
@@ -46,7 +50,7 @@
                 </div>
 
                 <div class="callout" id="overview-callout">
-                    <strong>Reading this chart:</strong> The 100% line is each agency's historical median pace. An agency at 80% has obligated only four-fifths of what it normally would have by this point in the year. The Oct&ndash;Nov segment is faded because October marks the start of the fiscal year, when all agencies begin at 100% by definition.
+                    <strong>Reading this chart:</strong> The 100% line is each agency's historical mean pace. An agency at 80% has obligated only four-fifths of what it normally would have by this point in the year. The Oct&ndash;Nov segment is faded because October marks the start of the fiscal year, when all agencies begin at 100% by definition.
                 </div>
 
                 <h2 class="section-heading" id="overview-agency-heading"></h2>
@@ -54,10 +58,8 @@
                 <div class="chart-wide">
                     <div class="agency-grid" id="agency-small-multiples"></div>
                 </div>
-            </section>
 
-            <!-- Agency Detail Tab -->
-            <section id="tab-agency" class="tab-panel" role="tabpanel">
+                <h2 class="section-heading">Agency Detail</h2>
                 <div class="agency-selector">
                     <label class="selector-label" for="agency-select">Select Agency</label>
                     <div class="select-wrapper">
@@ -97,71 +99,218 @@
                 </div>
             </section>
 
-            <!-- Data Tab -->
+            <!-- New Awards Tab -->
+            <section id="tab-awards" class="tab-panel" role="tabpanel">
+                <div class="callout" id="awards-intro-callout">
+                    <strong>What this tracks.</strong> The obligation data on the previous tab measures <em>total</em> spending commitments&mdash;including continuations, salaries, and contracts. This tab tracks the <em>pace of new grant-making</em>: how quickly agencies are issuing new awards compared to prior years. For NIH and NSF, data comes from agency-specific APIs (NIH Reporter, NSF Awards). For DOE, NASA, and USDA, new award obligations are drawn from USASpending.gov. All sources are filtered to new awards only, excluding continuations and modifications. Comparisons are normalized by each agency's relevant research appropriation to account for budget changes over time.
+                </div>
+
+                <div class="chart-header">
+                    <h3 class="chart-title" id="awards-multi-title"></h3>
+                    <p class="chart-subtitle">Each line shows an agency's current award-making pace as a percentage of its historical mean at the same point in the fiscal year.</p>
+                </div>
+
+                <div class="chart-wide">
+                    <div class="chart-card">
+                        <div id="chart-awards-multi" aria-label="Multi-agency award pace comparison chart"></div>
+                    </div>
+                </div>
+
+                <div class="callout">
+                    <strong>Reading this chart:</strong> The 100% line is each agency's historical mean award-making pace. An agency at 50% has issued only half the new award dollars it normally would have by this point in the fiscal year, as a share of its annual appropriation. NIH and NSF values are based on individual awards from agency APIs; DOE, NASA, and USDA values are based on monthly new-award obligations from USASpending.gov.
+                </div>
+
+                <h2 class="section-heading">Individual Agency Award Trends</h2>
+                <p class="section-subheading">Cumulative new awards over the fiscal year, plotted against the range of prior years.</p>
+                <div class="chart-wide">
+                    <div class="agency-grid" id="awards-small-multiples"></div>
+                </div>
+
+                <h2 class="section-heading">Agency Detail</h2>
+                <div class="agency-selector">
+                    <label class="selector-label" for="awards-agency-select">Select Agency</label>
+                    <div class="select-wrapper">
+                        <select id="awards-agency-select"></select>
+                    </div>
+                </div>
+
+                <div class="metrics-row" id="awards-metrics"></div>
+
+                <div class="chart-controls" id="awards-toggle-container" style="display:none;">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="awards-toggle-counts">
+                        <span class="toggle-switch"></span>
+                        <span class="toggle-text">Show grant counts</span>
+                    </label>
+                </div>
+
+                <div class="chart-header">
+                    <h3 class="chart-title" id="awards-detail-title"></h3>
+                    <p class="chart-subtitle" id="awards-detail-subtitle"></p>
+                </div>
+
+                <div class="chart-wide">
+                    <div class="chart-card">
+                        <div id="chart-awards-detail" aria-label="Agency award cumulative chart"></div>
+                    </div>
+                </div>
+
+                <div class="source-badge" id="awards-source-badge"></div>
+            </section>
+
+            <!-- Data & Methods Tab -->
             <section id="tab-data" class="tab-panel" role="tabpanel">
-                <div class="methodology-note">
-                    <strong>Methodology.</strong> All figures are drawn from OMB SF-133 Reports on Budget Execution and Budgetary Resources,
-                    published by the Office of Management and Budget. These reports are generated from agency-reported data in the
-                    FACTS II system and represent the official record of federal budget execution.
-
-                    <p><strong>Obligations</strong> are measured using Line 2190 (total new obligations &amp; upward adjustments, combining
-                    unexpired and expired accounts). This is the broadest measure of binding spending commitments.</p>
-
-                    <p><strong>Appropriations</strong> use Line 1100 (discretionary) + Line 1200 (mandatory)&mdash;the raw enacted
-                    appropriation figures rather than net totals (Lines 1160/1260). Net totals include CR preclusions (Line 1134),
-                    which can dramatically understate the full-year appropriation during a Continuing Resolution. Once a full-year
-                    appropriations bill is enacted, Line 1134 goes to zero and the raw and net figures converge.</p>
-
-                    <p><strong>Reporting cadence.</strong> SF-133 data is reported monthly for October through September of each
-                    fiscal year. Quarterly reports (December, March, June, September) are considered official; monthly reports are
-                    preliminary. This tracker uses all available periods for the most current picture.</p>
-
-                    <p><strong>Agency filtering.</strong> Each tracked agency corresponds to specific Treasury Account Fund Symbols (TAFS)
-                    or bureau codes within department-level SF-133 files. For example, NIH data is filtered by bureau name within the
-                    HHS file, excluding management and facilities accounts that are not research-related. NSF, DOE Office of Science,
-                    NASA Science, and USDA research accounts are filtered by specific TRACCT codes.</p>
-
-                    <p><strong>Historical range.</strong> The shaded band on spend-down charts shows the minimum-to-maximum range across
-                    prior fiscal years (FY2016&ndash;FY2024). The dashed line shows the median. These provide context for whether
-                    current-year spending is within normal bounds.</p>
+                <div class="agency-selector">
+                    <label class="selector-label" for="data-section-select">View</label>
+                    <div class="select-wrapper">
+                        <select id="data-section-select">
+                            <option value="obligations">Obligations</option>
+                            <option value="awards">New Awards</option>
+                        </select>
+                    </div>
                 </div>
 
-                <h2 class="section-heading">Appropriations &amp; Obligations</h2>
-                <div class="table-wrapper">
-                    <table id="table-approp" class="data-table">
-                        <caption>Annual appropriation and obligation totals by agency, nominal dollars.</caption>
-                        <thead></thead>
-                        <tbody></tbody>
-                    </table>
+                <!-- Obligations Data Section -->
+                <div id="data-section-obligations" class="data-section">
+                    <div class="methodology-note">
+                        <strong>Methodology.</strong> All figures are drawn from OMB SF-133 Reports on Budget Execution and Budgetary Resources,
+                        published by the Office of Management and Budget. These reports are generated from agency-reported data in the
+                        FACTS II system and represent the official record of federal budget execution.
+
+                        <p><strong>Obligations</strong> are measured using Line 2190 (total new obligations &amp; upward adjustments, combining
+                        unexpired and expired accounts). This is the broadest measure of binding spending commitments.</p>
+
+                        <p><strong>Appropriations</strong> use Line 1100 (discretionary) + Line 1200 (mandatory)&mdash;the raw enacted
+                        appropriation figures rather than net totals (Lines 1160/1260). Net totals include CR preclusions (Line 1134),
+                        which can dramatically understate the full-year appropriation during a Continuing Resolution. Once a full-year
+                        appropriations bill is enacted, Line 1134 goes to zero and the raw and net figures converge.</p>
+
+                        <p><strong>Reporting cadence.</strong> SF-133 data is reported monthly for October through September of each
+                        fiscal year. Quarterly reports (December, March, June, September) are considered official; monthly reports are
+                        preliminary. This tracker uses all available periods for the most current picture.</p>
+
+                        <p><strong>Agency filtering.</strong> Each tracked agency corresponds to specific Treasury Account Fund Symbols (TAFS)
+                        or bureau codes within department-level SF-133 files. For example, NIH data is filtered by bureau name within the
+                        HHS file, excluding management and facilities accounts that are not research-related. NSF, DOE Office of Science,
+                        NASA Science, and USDA research accounts are filtered by specific TRACCT codes.</p>
+
+                        <p><strong>Historical range.</strong> The shaded band on spend-down charts shows the minimum-to-maximum range across
+                        prior fiscal years (FY2016&ndash;FY2024). The dashed line shows the mean. These provide context for whether
+                        current-year spending is within normal bounds.</p>
+                    </div>
+
+                    <h2 class="section-heading">Appropriations &amp; Obligations</h2>
+                    <div class="table-wrapper">
+                        <table id="table-approp" class="data-table">
+                            <caption>Annual appropriation and obligation totals by agency, nominal dollars.</caption>
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <h2 class="section-heading" id="yoy-heading"></h2>
+                    <div class="table-wrapper">
+                        <table id="table-yoy" class="data-table">
+                            <caption>Year-over-year comparison of obligation rates at the latest reporting period.</caption>
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <div class="glossary">
+                        <h3>Glossary</h3>
+                        <dl>
+                            <dt>Appropriation</dt>
+                            <dd>Budget authority enacted by Congress allowing an agency to incur obligations and make payments.</dd>
+
+                            <dt>Obligation</dt>
+                            <dd>A binding commitment to pay for goods, services, or other expenses&mdash;the primary measure of spending activity.</dd>
+
+                            <dt>Outlay</dt>
+                            <dd>Actual disbursement of funds from the Treasury. May lag behind obligations by months or years.</dd>
+
+                            <dt>Budget Authority</dt>
+                            <dd>Total authority to enter financial obligations, including appropriations, borrowing, and contract authority.</dd>
+
+                            <dt>Continuing Resolution</dt>
+                            <dd>Temporary funding at prior-year levels when full-year appropriations have not been enacted. During a CR, Line 1134 preclusions reduce net appropriation figures substantially.</dd>
+                        </dl>
+                    </div>
                 </div>
 
-                <h2 class="section-heading" id="yoy-heading"></h2>
-                <div class="table-wrapper">
-                    <table id="table-yoy" class="data-table">
-                        <caption>Year-over-year comparison of obligation rates at the latest reporting period.</caption>
-                        <thead></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <!-- New Awards Data Section -->
+                <div id="data-section-awards" class="data-section" style="display:none;">
+                    <div class="methodology-note">
+                        <strong>Methodology.</strong> This section covers the pace of new grant-making at each agency, complementing the total obligation data drawn from SF-133 reports.
+                        Total obligations can appear normal even when new award activity has collapsed, because continuing grants, salaries, and contracts keep flowing.
+                        Tracking new awards separately reveals disruptions to the pipeline of new research funding.
 
-                <div class="glossary">
-                    <h3>Glossary</h3>
-                    <dl>
-                        <dt>Appropriation</dt>
-                        <dd>Budget authority enacted by Congress allowing an agency to incur obligations and make payments.</dd>
+                        <p><strong>NIH</strong> data comes from the <a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a>.
+                        Awards are filtered to Type 1 (new) and Type 2 (competing renewal) grants, excluding subprojects.
+                        Date is based on the award notice date. Data is available daily from FY2016 onward.</p>
 
-                        <dt>Obligation</dt>
-                        <dd>A binding commitment to pay for goods, services, or other expenses&mdash;the primary measure of spending activity.</dd>
+                        <p><strong>NSF</strong> data comes from the <a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a>.
+                        All new awards are included, dated by the award decision date (not the project start date, which may be months later).
+                        Data is available daily from FY2016 onward.</p>
 
-                        <dt>Outlay</dt>
-                        <dd>Actual disbursement of funds from the Treasury. May lag behind obligations by months or years.</dd>
+                        <p><strong>DOE Office of Science, NASA Science, and USDA</strong> data comes from
+                        <a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a>,
+                        filtered to project grants and cooperative agreements (award type codes 04 and 05) under agency-specific CFDA program numbers.
+                        The <code>new_awards_only</code> filter excludes continuations and modifications.
+                        Data is reported monthly. USASpending coverage begins in FY2017&ndash;2019 depending on the agency;
+                        years with incomplete data are automatically excluded from the historical baseline.</p>
 
-                        <dt>Budget Authority</dt>
-                        <dd>Total authority to enter financial obligations, including appropriations, borrowing, and contract authority.</dd>
+                        <p><strong>Historical range.</strong> The shaded band on award charts shows the minimum-to-maximum range across
+                        available prior fiscal years. The dashed line shows the mean. Because USASpending data availability varies by agency,
+                        the baseline period may differ: NIH and NSF use FY2016&ndash;2024, while DOE, NASA, and USDA baselines begin later.</p>
 
-                        <dt>Continuing Resolution</dt>
-                        <dd>Temporary funding at prior-year levels when full-year appropriations have not been enacted. During a CR, Line 1134 preclusions reduce net appropriation figures substantially.</dd>
-                    </dl>
+                        <p><strong>Normalization.</strong> To compare across years and agencies, cumulative new award dollars are expressed
+                        as a percentage of the discretionary appropriation (SF-133 Line 1100) for the relevant research component.
+                        This removes variation from budget changes over time, isolating changes in award-making pace.
+                        The overview chart divides the current value by the historical mean at the same point in the fiscal year
+                        to produce the "% of mean pace" metric. Metric cards use the same normalization: year-over-year and
+                        vs-mean comparisons are based on appropriation-normalized values, not raw dollar amounts.
+                        Agencies whose mean appropriation share is below 0.05% at a given point are excluded from the overview chart
+                        to avoid noisy ratios from small denominators.</p>
+                    </div>
+
+                    <h2 class="section-heading">Annual New Award Totals</h2>
+                    <div class="table-wrapper">
+                        <table id="table-awards-annual" class="data-table">
+                            <caption>End-of-year cumulative new award counts and dollars by agency and fiscal year.</caption>
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <h2 class="section-heading" id="awards-data-summary-heading">Year-over-Year Comparison</h2>
+                    <div class="table-wrapper">
+                        <table id="table-awards-summary" class="data-table">
+                            <caption>Current fiscal year award totals compared to prior year and historical mean, as of the latest available date.</caption>
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <div class="glossary">
+                        <h3>Glossary</h3>
+                        <dl>
+                            <dt>New Award (NIH)</dt>
+                            <dd>A Type 1 (new) or Type 2 (competing renewal) grant, as classified by NIH. Excludes non-competing continuations, supplements, and subprojects.</dd>
+
+                            <dt>New Award (NSF)</dt>
+                            <dd>An award whose decision date falls within the fiscal year. Continuing grant increments retain the original award's start date and are not double-counted.</dd>
+
+                            <dt>New Grant Obligation (USASpending)</dt>
+                            <dd>A project grant or cooperative agreement obligation classified as a new award by USASpending.gov, excluding modifications to existing awards.</dd>
+
+                            <dt>Cumulative Dollars</dt>
+                            <dd>Running total of new award dollars from the start of the fiscal year (October 1) through the latest available date.</dd>
+
+                            <dt>% of Appropriation</dt>
+                            <dd>Cumulative new award dollars divided by the agency's full-year discretionary appropriation (SF-133 Line 1100). Provides a budget-normalized view of award pace.</dd>
+                        </dl>
+                    </div>
                 </div>
             </section>
         </main>
@@ -169,8 +318,8 @@
         <!-- Footer -->
         <footer class="site-footer">
             <div class="container">
-                <span>Source: <a href="https://portal.max.gov/portal/document/SF133/Budget/FACTS%20II%20-%20SF%20133%20Report%20on%20Budget%20Execution%20and%20Budgetary%20Resources.html" target="_blank" rel="noopener">OMB SF-133 Reports on Budget Execution</a></span>
-                <span>Obligations: Line 2190&ensp;&middot;&ensp;Appropriations: Lines 1100 + 1200</span>
+                <span>Budget data: <a href="https://portal.max.gov/portal/document/SF133/Budget/FACTS%20II%20-%20SF%20133%20Report%20on%20Budget%20Execution%20and%20Budgetary%20Resources.html" target="_blank" rel="noopener">OMB SF-133 Reports on Budget Execution</a>&ensp;&middot;&ensp;Obligations: Line 2190&ensp;&middot;&ensp;Appropriations: Lines 1100 + 1200</span>
+                <span>Award data: NIH Reporter API&ensp;&middot;&ensp;NSF Awards API&ensp;&middot;&ensp;USASpending.gov</span>
                 <span class="footer-build" id="footer-build"></span>
             </div>
         </footer>
