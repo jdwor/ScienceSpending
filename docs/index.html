@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Science Spend-Down</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div class="site-wrapper">
+        <!-- Header -->
+        <header class="site-header">
+            <div class="header-inner">
+                <h1 class="site-title">Science Spend-Down</h1>
+                <p class="site-subtitle">Federal agencies obligate tens of billions in science funding each year on a predictable schedule. When that pace breaks from its historical pattern, it tells us something important about the state of the research enterprise. This tracker follows obligation rates at five major science agencies using OMB budget execution data.</p>
+                <div class="data-badge" id="data-badge"></div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="tab-nav" role="tablist" aria-label="Main navigation">
+            <div class="container">
+                <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="tab-overview">Overview</button>
+                <button class="tab-btn" data-tab="agency" role="tab" aria-selected="false" aria-controls="tab-agency">Agency Detail</button>
+                <button class="tab-btn" data-tab="data" role="tab" aria-selected="false" aria-controls="tab-data">Data</button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="container">
+            <!-- Overview Tab -->
+            <section id="tab-overview" class="tab-panel active" role="tabpanel">
+                <div class="chart-header">
+                    <h3 class="chart-title" id="overview-chart-title"></h3>
+                    <p class="chart-subtitle">Each line shows how an agency's current obligation rate compares to its historical median. A value below 100% means the agency has obligated less than it typically would have by that point in the fiscal year.</p>
+                </div>
+
+                <div class="chart-wide">
+                    <div class="chart-card">
+                        <div id="chart-multi-agency" aria-label="Multi-agency obligation pace comparison chart"></div>
+                    </div>
+                </div>
+
+                <div class="callout" id="overview-callout">
+                    <strong>Reading this chart:</strong> The 100% line is each agency's historical median pace. An agency at 80% has obligated only four-fifths of what it normally would have by this point in the year. The Oct&ndash;Nov segment is faded because October marks the start of the fiscal year, when all agencies begin at 100% by definition.
+                </div>
+
+                <h2 class="section-heading" id="overview-agency-heading"></h2>
+                <p class="section-subheading">Each agency's cumulative obligations over the fiscal year, plotted against the range of prior years.</p>
+                <div class="chart-wide">
+                    <div class="agency-grid" id="agency-small-multiples"></div>
+                </div>
+            </section>
+
+            <!-- Agency Detail Tab -->
+            <section id="tab-agency" class="tab-panel" role="tabpanel">
+                <div class="agency-selector">
+                    <label class="selector-label" for="agency-select">Select Agency</label>
+                    <div class="select-wrapper">
+                        <select id="agency-select"></select>
+                    </div>
+                </div>
+
+                <p id="agency-description" class="editorial-text"></p>
+
+                <div class="metrics-row" id="agency-metrics"></div>
+
+                <div class="chart-controls">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggle-dollars">
+                        <span class="toggle-switch"></span>
+                        <span class="toggle-text">Show dollar amounts</span>
+                    </label>
+                </div>
+
+                <div class="chart-header">
+                    <h3 class="chart-title" id="agency-chart-title"></h3>
+                    <p class="chart-subtitle" id="agency-chart-subtitle"></p>
+                </div>
+
+                <div class="chart-wide">
+                    <div class="chart-card">
+                        <div id="chart-agency-detail" aria-label="Agency obligation spend-down chart"></div>
+                    </div>
+                </div>
+
+                <div class="export-toolbar">
+                    <span class="export-toolbar-label">Export</span>
+                    <div class="export-buttons">
+                        <button class="btn-export" id="btn-download-png">PNG</button>
+                        <button class="btn-export" id="btn-download-csv">CSV</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Tab -->
+            <section id="tab-data" class="tab-panel" role="tabpanel">
+                <div class="methodology-note">
+                    <strong>Methodology.</strong> All figures are drawn from OMB SF-133 Reports on Budget Execution and Budgetary Resources,
+                    published by the Office of Management and Budget. These reports are generated from agency-reported data in the
+                    FACTS II system and represent the official record of federal budget execution.
+
+                    <p><strong>Obligations</strong> are measured using Line 2190 (total new obligations &amp; upward adjustments, combining
+                    unexpired and expired accounts). This is the broadest measure of binding spending commitments.</p>
+
+                    <p><strong>Appropriations</strong> use Line 1100 (discretionary) + Line 1200 (mandatory)&mdash;the raw enacted
+                    appropriation figures rather than net totals (Lines 1160/1260). Net totals include CR preclusions (Line 1134),
+                    which can dramatically understate the full-year appropriation during a Continuing Resolution. Once a full-year
+                    appropriations bill is enacted, Line 1134 goes to zero and the raw and net figures converge.</p>
+
+                    <p><strong>Reporting cadence.</strong> SF-133 data is reported monthly for October through September of each
+                    fiscal year. Quarterly reports (December, March, June, September) are considered official; monthly reports are
+                    preliminary. This tracker uses all available periods for the most current picture.</p>
+
+                    <p><strong>Agency filtering.</strong> Each tracked agency corresponds to specific Treasury Account Fund Symbols (TAFS)
+                    or bureau codes within department-level SF-133 files. For example, NIH data is filtered by bureau name within the
+                    HHS file, excluding management and facilities accounts that are not research-related. NSF, DOE Office of Science,
+                    NASA Science, and USDA research accounts are filtered by specific TRACCT codes.</p>
+
+                    <p><strong>Historical range.</strong> The shaded band on spend-down charts shows the minimum-to-maximum range across
+                    prior fiscal years (FY2016&ndash;FY2024). The dashed line shows the median. These provide context for whether
+                    current-year spending is within normal bounds.</p>
+                </div>
+
+                <h2 class="section-heading">Appropriations &amp; Obligations</h2>
+                <div class="table-wrapper">
+                    <table id="table-approp" class="data-table">
+                        <caption>Annual appropriation and obligation totals by agency, nominal dollars.</caption>
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <h2 class="section-heading" id="yoy-heading"></h2>
+                <div class="table-wrapper">
+                    <table id="table-yoy" class="data-table">
+                        <caption>Year-over-year comparison of obligation rates at the latest reporting period.</caption>
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div class="glossary">
+                    <h3>Glossary</h3>
+                    <dl>
+                        <dt>Appropriation</dt>
+                        <dd>Budget authority enacted by Congress allowing an agency to incur obligations and make payments.</dd>
+
+                        <dt>Obligation</dt>
+                        <dd>A binding commitment to pay for goods, services, or other expenses&mdash;the primary measure of spending activity.</dd>
+
+                        <dt>Outlay</dt>
+                        <dd>Actual disbursement of funds from the Treasury. May lag behind obligations by months or years.</dd>
+
+                        <dt>Budget Authority</dt>
+                        <dd>Total authority to enter financial obligations, including appropriations, borrowing, and contract authority.</dd>
+
+                        <dt>Continuing Resolution</dt>
+                        <dd>Temporary funding at prior-year levels when full-year appropriations have not been enacted. During a CR, Line 1134 preclusions reduce net appropriation figures substantially.</dd>
+                    </dl>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer">
+            <div class="container">
+                <span>Source: <a href="https://portal.max.gov/portal/document/SF133/Budget/FACTS%20II%20-%20SF%20133%20Report%20on%20Budget%20Execution%20and%20Budgetary%20Resources.html" target="_blank" rel="noopener">OMB SF-133 Reports on Budget Execution</a></span>
+                <span>Obligations: Line 2190&ensp;&middot;&ensp;Appropriations: Lines 1100 + 1200</span>
+                <span class="footer-build" id="footer-build"></span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
