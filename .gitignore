@@ -3,4 +3,4 @@ awards/cache/
 output/
 __pycache__/
 *.pyc
-.streamlit/
+.DS_Store

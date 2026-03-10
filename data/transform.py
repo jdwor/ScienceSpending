@@ -114,7 +114,7 @@ def compute_yoy_comparison(
 
     Returns DataFrame with columns:
         agency, period_month, current_obligations, prior_year_obligations,
-        yoy_change, yoy_pct_change, median_prior_obligations
+        yoy_change, yoy_pct_change, mean_prior_obligations
     """
     records = []
 
@@ -139,7 +139,7 @@ def compute_yoy_comparison(
 
             # Mean spend-down rate across all prior years at same month
             prior_all = prior[prior["period_month"] == month]["pct_obligated"]
-            median_pct = prior_all.mean() if not prior_all.empty else None
+            mean_pct = prior_all.mean() if not prior_all.empty else None
 
             yoy_diff = (curr_pct - prior_pct) if prior_pct is not None else None
 
@@ -151,7 +151,7 @@ def compute_yoy_comparison(
                 "current_pct": curr_pct,
                 "prior_year_pct": prior_pct,
                 "yoy_diff": yoy_diff,
-                "median_prior_pct": median_pct,
+                "mean_prior_pct": mean_pct,
             })
 
     return pd.DataFrame(records)

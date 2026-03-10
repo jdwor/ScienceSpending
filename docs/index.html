@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Science Spend-Down</title>
+    <title>Spending on Science</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,8 +15,8 @@
         <!-- Header -->
         <header class="site-header">
             <div class="header-inner">
-                <h1 class="site-title">Science Spend-Down</h1>
-                <p class="site-subtitle">Federal agencies spend tens of billions on science each year on a predictable schedule. When that pace breaks from its historical pattern, it tells us something important about the state of the research enterprise. This tracker follows both total obligation rates and new award activity at five major science agencies.</p>
+                <h1 class="site-title">Spending on Science</h1>
+                <p class="site-subtitle">U.S. federal agencies spend tens of billions of dollars on science and R&amp;D each year. This spending follows a relatively predictable schedule, which ensures agencies are able to efficiently allocate resources to the most effective and meritorious research teams. This site follows both total obligation rates and new award activity at five major science agencies to transparently track the pace of spending on science.</p>
                 <div class="data-badge" id="data-badge"></div>
             </div>
         </header>
@@ -35,7 +35,7 @@
             <!-- Obligations Tab -->
             <section id="tab-obligations" class="tab-panel active" role="tabpanel">
                 <div class="callout">
-                    <strong>What this tracks.</strong> Obligations are binding commitments to spend federal funds&mdash;the broadest measure of spending activity. This tab shows <em>total</em> obligations at each agency, including grants, contracts, salaries, and continuations. Because it captures all spending, the obligation pace is slow to reflect disruptions to new research funding specifically. See the <strong>New Awards</strong> tab for that view.
+                    <strong>What this tracks.</strong> Obligations are commitments to spend federal funds, and represent the broadest measure of agencies' spending activity. This tab shows total obligations within each agency's research function, including grants, contracts, salaries, and continuations. The data come from OMB's SF 133 Report on Budget Execution, and are normalized to the reported appropriations for the relevant agency functions. Because it captures all spending, the obligation pace is slow to reflect disruptions to new research funding specifically. See the <em>New Awards</em> tab for that view.
                 </div>
 
                 <div class="chart-header">
@@ -50,7 +50,7 @@
                 </div>
 
                 <div class="callout" id="overview-callout">
-                    <strong>Reading this chart:</strong> The 100% line is each agency's historical mean pace. An agency at 80% has obligated only four-fifths of what it normally would have by this point in the year. The Oct&ndash;Nov segment is faded because October marks the start of the fiscal year, when all agencies begin at 100% by definition.
+                    <strong>Reading this chart:</strong> The 100% line is each agency's historical mean pace. An agency at 80% has obligated only four-fifths of what it normally would have by this point in the year. The Oct&ndash;Nov segment is faded because October marks the start of the fiscal year, when all agencies begin on pace by definition.
                 </div>
 
                 <h2 class="section-heading" id="overview-agency-heading"></h2>
@@ -59,15 +59,13 @@
                     <div class="agency-grid" id="agency-small-multiples"></div>
                 </div>
 
-                <h2 class="section-heading">Agency Detail</h2>
-                <div class="agency-selector">
-                    <label class="selector-label" for="agency-select">Select Agency</label>
-                    <div class="select-wrapper">
+                <div class="section-heading-inline">
+                    <h2 class="section-heading">Agency Detail:</h2>
+                    <div class="select-wrapper select-inline">
                         <select id="agency-select"></select>
                     </div>
                 </div>
-
-                <p id="agency-description" class="editorial-text"></p>
+                <p class="section-subheading">Summary metrics and a detailed spend-down chart for the selected agency, with current-year data plotted against the historical range.</p>
 
                 <div class="metrics-row" id="agency-metrics"></div>
 
@@ -77,11 +75,6 @@
                         <span class="toggle-switch"></span>
                         <span class="toggle-text">Show dollar amounts</span>
                     </label>
-                </div>
-
-                <div class="chart-header">
-                    <h3 class="chart-title" id="agency-chart-title"></h3>
-                    <p class="chart-subtitle" id="agency-chart-subtitle"></p>
                 </div>
 
                 <div class="chart-wide">
@@ -102,7 +95,7 @@
             <!-- New Awards Tab -->
             <section id="tab-awards" class="tab-panel" role="tabpanel">
                 <div class="callout" id="awards-intro-callout">
-                    <strong>What this tracks.</strong> The obligation data on the previous tab measures <em>total</em> spending commitments&mdash;including continuations, salaries, and contracts. This tab tracks the <em>pace of new grant-making</em>: how quickly agencies are issuing new awards compared to prior years. For NIH and NSF, data comes from agency-specific APIs (NIH Reporter, NSF Awards). For DOE, NASA, and USDA, new award obligations are drawn from USASpending.gov. All sources are filtered to new awards only, excluding continuations and modifications. Comparisons are normalized by each agency's relevant research appropriation to account for budget changes over time.
+                    <strong>What this tracks.</strong> The obligation data on the previous tab measure total spending commitments, including continuations, salaries, and contracts. This tab tracks the pace of new grant-making: how quickly agencies are issuing new awards compared to prior years. For NIH and NSF, data come from agency-specific APIs (NIH Reporter, NSF Awards). For DOE, NASA, and USDA, new award obligations are drawn from USASpending.gov. All sources are filtered to new awards only, excluding continuations and modifications. Comparisons in new grant spending are normalized to the reported appropriations for the relevant agency functions &ndash; rather than total dollar amounts, or fraction of end-of-year spending &ndash; to account for changes over time in the total agency budget and/or full-year underspending.
                 </div>
 
                 <div class="chart-header">
@@ -126,13 +119,13 @@
                     <div class="agency-grid" id="awards-small-multiples"></div>
                 </div>
 
-                <h2 class="section-heading">Agency Detail</h2>
-                <div class="agency-selector">
-                    <label class="selector-label" for="awards-agency-select">Select Agency</label>
-                    <div class="select-wrapper">
+                <div class="section-heading-inline">
+                    <h2 class="section-heading">Agency Detail:</h2>
+                    <div class="select-wrapper select-inline">
                         <select id="awards-agency-select"></select>
                     </div>
                 </div>
+                <p class="section-subheading">Summary metrics and a cumulative award chart for the selected agency, with current-year data plotted against the historical range.</p>
 
                 <div class="metrics-row" id="awards-metrics"></div>
 
@@ -142,11 +135,6 @@
                         <span class="toggle-switch"></span>
                         <span class="toggle-text">Show grant counts</span>
                     </label>
-                </div>
-
-                <div class="chart-header">
-                    <h3 class="chart-title" id="awards-detail-title"></h3>
-                    <p class="chart-subtitle" id="awards-detail-subtitle"></p>
                 </div>
 
                 <div class="chart-wide">
@@ -160,9 +148,9 @@
 
             <!-- Data & Methods Tab -->
             <section id="tab-data" class="tab-panel" role="tabpanel">
-                <div class="agency-selector">
-                    <label class="selector-label" for="data-section-select">View</label>
-                    <div class="select-wrapper">
+                <div class="section-heading-inline">
+                    <h2 class="section-heading">View:</h2>
+                    <div class="select-wrapper select-inline">
                         <select id="data-section-select">
                             <option value="obligations">Obligations</option>
                             <option value="awards">New Awards</option>

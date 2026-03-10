@@ -183,8 +183,8 @@ def build_award_summary(
             mean_dollars_list.append(float(np.interp(latest_day, fy_data["fy_day"].values, fy_data["cumulative_dollars"].values)))
             mean_counts.append(int(np.interp(latest_day, fy_data["fy_day"].values, fy_data["cumulative_count"].values)))
 
-        median_count = float(np.mean(mean_counts)) if mean_counts else 0.0
-        median_dollars = float(np.mean(mean_dollars_list)) if mean_dollars_list else 0.0
+        mean_count = float(np.mean(mean_counts)) if mean_counts else 0.0
+        mean_dollars = float(np.mean(mean_dollars_list)) if mean_dollars_list else 0.0
 
         records.append({
             "agency": agency_key,
@@ -195,8 +195,8 @@ def build_award_summary(
             "cumul_dollars": float(latest["cumulative_dollars"]),
             "prior_year_count": prior_count,
             "prior_year_dollars": prior_dollars,
-            "median_count": median_count,
-            "median_dollars": median_dollars,
+            "mean_count": mean_count,
+            "mean_dollars": mean_dollars,
         })
 
     return pd.DataFrame(records)

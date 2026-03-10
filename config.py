@@ -104,16 +104,6 @@ AGENCIES = {
     },
 }
 
-# SF-133 file keys mapped to department-level file name fragments
-# Used for auto-generating filenames for years with descriptive naming
-FILE_KEY_TO_AGENCY_NAME = {
-    "hhs": "Department_of_Health_and_Human_Services",
-    "nsf": "National_Science_Foundation",
-    "doe": "Department_of_Energy",
-    "nasa": "National_Aeronautics_and_Space_Administration",
-    "usda": "Department_of_Agriculture",
-}
-
 FISCAL_YEARS = list(range(2016, 2027))
 CURRENT_FY = 2026
 # Years drawn as individual lines (not included in the prior-year band)

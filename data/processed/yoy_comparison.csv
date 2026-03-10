@@ -1,4 +1,4 @@
-agency,display_name,period_month,period_label,current_pct,prior_year_pct,yoy_diff,median_prior_pct
+agency,display_name,period_month,period_label,current_pct,prior_year_pct,yoy_diff,mean_prior_pct
 DOE_SC,DOE (Office of Science),2,Nov,23.800218206787882,17.58540209165674,6.214816115131143,14.081526822022965
 DOE_SC,DOE (Office of Science),3,Dec,28.736872731393937,29.923553520381407,-1.18668078898747,21.476736139821213
 DOE_SC,DOE (Office of Science),4,Jan,30.163512837818185,52.08774251334922,-21.924229675531034,33.9287261962891

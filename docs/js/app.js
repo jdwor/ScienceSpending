@@ -23,14 +23,6 @@
     };
 
     // ── Agency Descriptions ──
-    const AGENCY_DESCRIPTIONS = {
-        NIH: "The largest public funder of biomedical research, distributing most of its budget as extramural grants across 27 institutes and centers.",
-        NSF: "Funds fundamental research and education across all non-medical fields of science and engineering through competitive grants.",
-        DOE_SC: "The nation's largest sponsor of basic physical-sciences research, operating 17 national laboratories.",
-        NASA_SCI: "Funds Earth science, planetary exploration, astrophysics, and heliophysics missions and research.",
-        USDA_RD: "Spans the Agricultural Research Service (intramural) and National Institute of Food and Agriculture (extramural grants).",
-    };
-
     let DATA = null;
 
     // ── Utilities ──
@@ -84,19 +76,38 @@
         return annots;
     }
 
-    function sourceAnnotation(yOffset) {
+    function sourceAnnotation(text, yOffset) {
         return {
-            text: "Source: OMB SF-133",
+            text: text || "Source: OMB SF-133",
             xref: 'paper',
             yref: 'paper',
             x: 1,
-            y: yOffset || -0.19,
+            y: yOffset || -0.30,
             xanchor: 'right',
             yanchor: 'top',
             showarrow: false,
             font: { family: FONT_SANS, size: 9, color: '#9ca3af' },
         };
     }
+
+    // Plotly config for full-size charts (shows camera icon on hover)
+    const PLOTLY_CONFIG_EXPORT = {
+        displayModeBar: 'hover',
+        modeBarButtonsToRemove: [
+            'zoom2d', 'pan2d', 'select2d', 'lasso2d',
+            'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d',
+        ],
+        toImageButtonOptions: {
+            format: 'png',
+            width: 1200,
+            height: 700,
+            scale: 2,
+        },
+        responsive: true,
+    };
+
+    // Plotly config for small multiples (no mode bar)
+    const PLOTLY_CONFIG_COMPACT = { displayModeBar: false, responsive: true };
 
     function baseAxisStyle() {
         return {
@@ -118,8 +129,24 @@
         const parts = [];
 
         if (cfg.latest_period_label) {
-            parts.push('Data through ' + cfg.latest_period_label + ' FY' + cfg.current_fy);
+            parts.push('Obligations through ' + cfg.latest_period_label + ' FY' + cfg.current_fy);
         }
+
+        // Find latest awards date across all agencies
+        if (DATA.awards_summary) {
+            let latestAwardDate = null;
+            for (const key of Object.keys(DATA.awards_summary)) {
+                const d = DATA.awards_summary[key].latest_date;
+                if (d && (!latestAwardDate || d > latestAwardDate)) latestAwardDate = d;
+            }
+            if (latestAwardDate) {
+                const dt = new Date(latestAwardDate + 'T00:00:00');
+                const monthName = dt.toLocaleString('en-US', { month: 'short' });
+                const fyMonth = dt.getMonth() >= 9 ? dt.getMonth() - 8 : dt.getMonth() + 4;
+                parts.push('Awards through ' + monthName + ' FY' + cfg.current_fy);
+            }
+        }
+
         if (cfg.build_date) {
             parts.push('Updated ' + cfg.build_date);
         }
@@ -259,6 +286,7 @@
                 ticksuffix: '%',
                 range: [-6, 200],
                 dtick: 20,
+                title: { text: '% of Mean Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -277,7 +305,7 @@
             plot_bgcolor: 'white',
             paper_bgcolor: 'white',
             height: 460,
-            margin: { l: 52, r: 12, t: 8, b: 85 },
+            margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
                     text: bandLabel + ' mean',
@@ -289,12 +317,12 @@
                     showarrow: false,
                     font: { family: FONT_SANS, size: 10, color: '#9ca3af' },
                 },
-                sourceAnnotation(-0.26),
+                sourceAnnotation("Source: OMB SF-133", -0.30),
                 ...obligationMonthLabels(false),
             ],
         };
 
-        Plotly.newPlot('chart-multi-agency', traces, layout, { displayModeBar: false, responsive: true });
+        Plotly.newPlot('chart-multi-agency', traces, layout, PLOTLY_CONFIG_COMPACT);
     }
 
     // ── Single-Agency Spend-Down Chart ──
@@ -409,8 +437,14 @@
         }
         const yBuffer = Math.max(yMax * 0.03, 0.1);
 
-        const height = compact ? 340 : 440;
-        const annotations = compact ? [] : [sourceAnnotation(-0.26)];
+        const height = compact ? 340 : 470;
+        const yAxisLabel = showPct ? '% of Appropriation Obligated' : 'Cumulative Obligations ($B)';
+        const detailSubtitle = showPct
+            ? 'Cumulative obligations as a percentage of full-year appropriations.'
+            : 'Cumulative obligations in billions of dollars by fiscal year month.';
+        const detailTitle = agency.display_name + ' \u2014 Obligation Spend-Down'
+            + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
+        const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133", -0.30)];
         annotations.push(...obligationMonthLabels(compact));
 
         const layout = {
@@ -419,7 +453,12 @@
                 font: { family: FONT_SANS, size: 12, weight: 600, color: TEXT_COLOR },
                 x: 0.02,
                 xanchor: 'left',
-            } : undefined,
+            } : {
+                text: detailTitle,
+                font: { family: FONT_SERIF, size: 16, weight: 600, color: TEXT_COLOR },
+                x: 0.01,
+                xanchor: 'left',
+            },
             xaxis: Object.assign({}, baseAxisStyle(), {
                 tickvals: ticks.vals,
                 ticktext: ticks.texts,
@@ -434,11 +473,12 @@
                 tick0: 0,
                 range: [-yBuffer, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
+                title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
                 yanchor: 'top',
-                y: compact ? -0.18 : -0.18,
+                y: -0.18,
                 xanchor: 'center',
                 x: 0.5,
                 font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR },
@@ -454,15 +494,15 @@
             paper_bgcolor: 'white',
             height: height,
             margin: {
-                l: compact ? 45 : 52,
+                l: compact ? 45 : 60,
                 r: 12,
-                t: compact ? 38 : 8,
-                b: compact ? 65 : 80,
+                t: compact ? 38 : 62,
+                b: compact ? 65 : 95,
             },
             annotations: annotations,
         };
 
-        Plotly.newPlot(targetDiv, traces, layout, { displayModeBar: false, responsive: true });
+        Plotly.newPlot(targetDiv, traces, layout, compact ? PLOTLY_CONFIG_COMPACT : PLOTLY_CONFIG_EXPORT);
     }
 
     // ── Small Multiples ──
@@ -534,11 +574,11 @@
 
         let medStr = 'N/A';
         let medDir = '';
-        if (summary.median_diff != null && summary.median_rel != null) {
-            const medSign = summary.median_diff >= 0 ? '+' : '';
-            const medRelSign = summary.median_rel >= 0 ? '+' : '';
-            medStr = medSign + summary.median_diff.toFixed(1) + 'pp (' + medRelSign + summary.median_rel.toFixed(1) + '%)';
-            medDir = summary.median_diff < 0 ? 'negative' : 'positive';
+        if (summary.mean_diff != null && summary.mean_rel != null) {
+            const medSign = summary.mean_diff >= 0 ? '+' : '';
+            const medRelSign = summary.mean_rel >= 0 ? '+' : '';
+            medStr = medSign + summary.mean_diff.toFixed(1) + 'pp (' + medRelSign + summary.mean_rel.toFixed(1) + '%)';
+            medDir = summary.mean_diff < 0 ? 'negative' : 'positive';
         }
 
         container.innerHTML =
@@ -564,24 +604,6 @@
         const agencyKey = select.value;
         const showDollars = document.getElementById('toggle-dollars').checked;
         const agency = DATA.config.agencies[agencyKey];
-
-        // Update description
-        const descEl = document.getElementById('agency-description');
-        if (descEl) {
-            descEl.textContent = AGENCY_DESCRIPTIONS[agencyKey] || '';
-        }
-
-        // Update chart title
-        const chartTitle = document.getElementById('agency-chart-title');
-        const chartSubtitle = document.getElementById('agency-chart-subtitle');
-        if (chartTitle && agency) {
-            chartTitle.textContent = agency.display_name;
-            if (chartSubtitle) {
-                chartSubtitle.textContent = showDollars
-                    ? 'Cumulative obligations in billions of dollars by fiscal year month.'
-                    : 'Cumulative obligations as a percentage of full-year appropriations.';
-            }
-        }
 
         renderMetrics(agencyKey);
         renderSpenddownChart(agencyKey, 'chart-agency-detail', !showDollars, false);
@@ -691,7 +713,7 @@
             { key: 'current_pct', label: `FY${cfg.current_fy}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
             { key: 'prior_year_pct', label: `FY${cfg.current_fy - 1}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
             { key: 'yoy_diff', label: 'Diff (pp)', format: v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) : '\u2014', cls: 'number' },
-            { key: 'median_prior_pct', label: 'Mean', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
+            { key: 'mean_prior_pct', label: 'Mean', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
         ];
 
         yoyHead.innerHTML = '<tr>' + yoyCols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
@@ -788,10 +810,10 @@
                 }
                 return '\u2014';
             }, cls: 'number' },
-            { key: 'median_dollars', label: 'Mean Dollars', format: v => v != null ? formatDollars(v) : '\u2014', cls: 'number' },
+            { key: 'mean_dollars', label: 'Mean Dollars', format: v => v != null ? formatDollars(v) : '\u2014', cls: 'number' },
             { key: '_pct_mean_dollars', label: '% of Mean', format: (v, row) => {
-                if (row.median_dollars && row.median_dollars > 0) {
-                    return (row.cumul_dollars / row.median_dollars * 100).toFixed(0) + '%';
+                if (row.mean_dollars && row.mean_dollars > 0) {
+                    return (row.cumul_dollars / row.mean_dollars * 100).toFixed(0) + '%';
                 }
                 return '\u2014';
             }, cls: 'number' },
@@ -827,8 +849,7 @@
     };
 
     function awardTickArrays() {
-        // Tick marks at month BOUNDARIES: day 1 (Oct 1), day 32 (Nov 1), ...,
-        // day 336 (Sep 1), day 366 (Oct 1 next FY = end-of-Sep boundary).
+        // Tick marks at month BOUNDARIES for the overview chart (fy_day scale).
         // ticktext is empty; visible labels come from annotations at midpoints.
         const vals = [];
         for (let i = 1; i <= 12; i++) {
@@ -865,6 +886,15 @@
             if (day >= AWARDS_FY_MONTH_DAYS[i]) return labels[i];
         }
         return '';
+    }
+
+    // Map fy_day (1–366) to a date string in a fixed reference fiscal year
+    // (FY2001: Oct 2000 – Sep 2001).  Using real dates lets the Plotly date
+    // axis format hover headers as month names automatically.
+    function fyDayToRefDate(day) {
+        const d = new Date(Date.UTC(2000, 9, 1)); // Oct 1, 2000
+        d.setUTCDate(d.getUTCDate() + day - 1);
+        return d.toISOString().slice(0, 10);
     }
 
     // ── Awards: Multi-Agency Pace Chart ──
@@ -978,13 +1008,16 @@
                 name: agencyCfg.display_name,
                 line: { color: agencyCfg.color, width: 2.5 },
                 marker: { size: isDaily ? 4 : 5, color: agencyCfg.color },
-                hovertemplate: '<b>' + agencyCfg.display_name + '</b>: %{y:.0f}% of mean pace<extra></extra>',
+                text: plotX.map(d => fyDayToMonth(d)),
+                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of mean pace<extra></extra>',
+                hoverlabel: { bordercolor: agencyCfg.color },
             });
         }
 
-        const titleEl = document.getElementById('awards-multi-title');
-        if (titleEl) {
-            titleEl.textContent = `FY${currentFy} Award-Making Pace vs. Historical Mean`;
+        // Set HTML chart title
+        const awardsTitleEl = document.getElementById('awards-multi-title');
+        if (awardsTitleEl) {
+            awardsTitleEl.textContent = `FY${currentFy} Award-Making Pace vs. Historical Mean`;
         }
 
         const layout = {
@@ -999,6 +1032,7 @@
                 ticksuffix: '%',
                 range: [-6, 200],
                 dtick: 20,
+                title: { text: '% of Mean Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -1017,7 +1051,7 @@
             plot_bgcolor: 'white',
             paper_bgcolor: 'white',
             height: 460,
-            margin: { l: 52, r: 12, t: 8, b: 85 },
+            margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
                     text: 'Historical mean',
@@ -1029,22 +1063,12 @@
                     showarrow: false,
                     font: { family: FONT_SANS, size: 10, color: '#9ca3af' },
                 },
-                {
-                    text: 'Source: NIH Reporter, NSF Awards, USASpending',
-                    xref: 'paper',
-                    yref: 'paper',
-                    x: 1,
-                    y: -0.26,
-                    xanchor: 'right',
-                    yanchor: 'top',
-                    showarrow: false,
-                    font: { family: FONT_SANS, size: 9, color: '#9ca3af' },
-                },
+                sourceAnnotation('Source: NIH Reporter, NSF Awards, USASpending', -0.30),
                 ...awardMonthLabels(false),
             ],
         };
 
-        Plotly.newPlot('chart-awards-multi', traces, layout, { displayModeBar: false, responsive: true });
+        Plotly.newPlot('chart-awards-multi', traces, layout, PLOTLY_CONFIG_COMPACT);
     }
 
     // ── Awards: Cumulative Chart (Single Agency) ──
@@ -1057,7 +1081,10 @@
 
         const agencyAwards = awards[agencyKey];
         const agencyCfg = cfg.agencies[agencyKey];
-        const ticks = awardTickArrays();
+        // Use the obligations tick scheme (0–12 month indices) so x-unified
+        // hover headers show month names.  All fy_day x-data is converted to
+        // Convert fy_day x-data to reference dates via fyDayToRefDate() so the
+        // Plotly date axis formats hover headers as month names automatically.
         const traces = [];
         const currentFy = cfg.current_fy;
 
@@ -1072,7 +1099,7 @@
 
         // Envelope band
         if (envelope) {
-            const days = envelope.fy_days;
+            const days = envelope.fy_days.map(fyDayToRefDate);
             const minV = envelope.min;
             const maxV = envelope.max;
             const medV = envelope.mean;
@@ -1111,13 +1138,12 @@
                 traces.push({
                     x: vd,
                     y: vmd,
-                    text: vd.map(d => fyDayToMonth(d)),
                     mode: 'lines',
                     line: { color: '#b0bac8', width: 1.5, dash: 'dot' },
                     showlegend: true,
                     name: medLabel,
-                    hovertemplate: isPct ? '%{text}<br><b>Mean</b>: %{y:.2f}%<extra></extra>'
-                        : '%{text}<br><b>Mean</b>: %{y:,.0f}<extra></extra>',
+                    hovertemplate: isPct ? '<b>Mean</b>: %{y:.2f}%<extra></extra>'
+                        : '<b>Mean</b>: %{y:,.0f}<extra></extra>',
                 });
             }
         }
@@ -1136,13 +1162,12 @@
 
             const color = HIGHLIGHT_COLORS[fy] || '#94a3b8';
             traces.push({
-                x: yearData.fy_days,
+                x: yearData.fy_days.map(fyDayToRefDate),
                 y: yearData[yCol],
-                text: yearData.fy_days.map(d => fyDayToMonth(d)),
                 mode: 'lines',
                 name: `FY ${fy}`,
                 line: { color: color, width: 1.8 },
-                hovertemplate: `%{text}<br><b>FY ${fy}</b>: ${hoverFmt}<extra></extra>`,
+                hovertemplate: `<b>FY ${fy}</b>: ${hoverFmt}<extra></extra>`,
             });
         }
 
@@ -1150,14 +1175,13 @@
         const currentData = agencyAwards.years[String(currentFy)];
         if (currentData) {
             traces.push({
-                x: currentData.fy_days,
+                x: currentData.fy_days.map(fyDayToRefDate),
                 y: currentData[yCol],
-                text: currentData.fy_days.map(d => fyDayToMonth(d)),
                 mode: isDaily ? 'lines' : 'lines+markers',
                 name: `FY ${currentFy}`,
                 line: { color: agencyCfg.color, width: 3 },
                 marker: { size: isDaily ? 0 : 6, color: agencyCfg.color },
-                hovertemplate: `%{text}<br><b>FY ${currentFy}</b>: ${hoverFmt}<extra></extra>`,
+                hovertemplate: `<b>FY ${currentFy}</b>: ${hoverFmt}<extra></extra>`,
             });
         }
 
@@ -1171,19 +1195,16 @@
         }
         const yBufferAward = Math.max(yMaxAward * 0.03, 0.01);
 
-        const height = compact ? 340 : 440;
-        const awardAnnotations = compact ? [] : [{
-            text: 'Source: ' + (SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type),
-            xref: 'paper',
-            yref: 'paper',
-            x: 1,
-            y: -0.26,
-            xanchor: 'right',
-            yanchor: 'top',
-            showarrow: false,
-            font: { family: FONT_SANS, size: 9, color: '#9ca3af' },
-        }];
-        awardAnnotations.push(...awardMonthLabels(compact));
+        const height = compact ? 340 : 470;
+        const sourceLabel = SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type;
+        const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel, -0.30)];
+
+        const awardYLabel = isPct ? '% of Appropriation Awarded' : isDollars ? 'Cumulative Awards ($M)' : 'Cumulative Award Count';
+        const awardsDetailSubtitle = mode === 'counts'
+            ? 'Cumulative new award count over the fiscal year.'
+            : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
+        const awardsDetailTitle = agencyCfg.display_name + ' \u2014 New Awards'
+            + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
 
         const layout = {
             title: compact ? {
@@ -1191,30 +1212,39 @@
                 font: { family: FONT_SANS, size: 12, weight: 600, color: TEXT_COLOR },
                 x: 0.02,
                 xanchor: 'left',
-            } : undefined,
+            } : {
+                text: awardsDetailTitle,
+                font: { family: FONT_SERIF, size: 16, weight: 600, color: TEXT_COLOR },
+                x: 0.01,
+                xanchor: 'left',
+            },
             xaxis: Object.assign({}, baseAxisStyle(), {
-                tickvals: ticks.vals,
-                ticktext: ticks.texts,
-                ticks: '',
-                range: [-15, 380],
+                type: 'date',
+                dtick: 'M1',
+                tickformat: '%b',
+                ticklabelmode: 'period',
+                hoverformat: '%b',
+                range: ['2000-09-25', '2001-10-05'],
                 showgrid: true,
+                tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
             }),
             yaxis: Object.assign({}, baseAxisStyle(), {
                 ticksuffix: isPct ? '%' : isDollars ? 'M' : '',
                 tickprefix: isDollars ? '$' : '',
                 range: [-yBufferAward, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
+                title: compact ? undefined : { text: awardYLabel, font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
                 yanchor: 'top',
-                y: compact ? -0.18 : -0.18,
+                y: -0.18,
                 xanchor: 'center',
                 x: 0.5,
                 font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR },
                 bgcolor: 'rgba(0,0,0,0)',
             },
-            hovermode: 'closest',
+            hovermode: 'x unified',
             hoverlabel: {
                 bgcolor: 'white',
                 bordercolor: '#e5e7eb',
@@ -1224,15 +1254,15 @@
             paper_bgcolor: 'white',
             height: height,
             margin: {
-                l: compact ? 45 : 52,
+                l: compact ? 45 : 60,
                 r: 12,
-                t: compact ? 38 : 8,
-                b: compact ? 65 : 80,
+                t: compact ? 38 : 62,
+                b: compact ? 65 : 95,
             },
             annotations: awardAnnotations,
         };
 
-        Plotly.newPlot(targetDiv, traces, layout, { displayModeBar: false, responsive: true });
+        Plotly.newPlot(targetDiv, traces, layout, compact ? PLOTLY_CONFIG_COMPACT : PLOTLY_CONFIG_EXPORT);
     }
 
     // ── Awards: Small Multiples ──
@@ -1332,9 +1362,14 @@
         // Card 6: Award count (NIH/NSF only — inherently normalized)
         if (hasCounts && summ.cumul_count) {
             const count = summ.cumul_count.toLocaleString();
-            const priorCount = summ.prior_year_count ? summ.prior_year_count.toLocaleString() : 'N/A';
-            const countDir = (summ.prior_year_count && summ.cumul_count < summ.prior_year_count) ? 'negative' : 'positive';
-            html += card(`FY${cfg.current_fy} Awards`, count, 'vs. ' + priorCount + ' in FY' + (cfg.current_fy - 1), countDir);
+            const meanCount = summ.mean_count ? Math.round(summ.mean_count).toLocaleString() : null;
+            let countDelta = '';
+            let countDir = '';
+            if (meanCount != null && summ.mean_count) {
+                countDelta = 'vs. mean of ' + meanCount;
+                countDir = summ.cumul_count < summ.mean_count ? 'negative' : 'positive';
+            }
+            html += card(`FY${cfg.current_fy} Awards`, count, countDelta, countDir);
         }
 
         container.innerHTML = html;
@@ -1363,18 +1398,6 @@
         const hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';
         const showCounts = hasCounts && document.getElementById('awards-toggle-counts').checked;
         const mode = showCounts ? 'counts' : 'pct';
-
-        // Update title
-        const titleEl = document.getElementById('awards-detail-title');
-        const subtitleEl = document.getElementById('awards-detail-subtitle');
-        if (titleEl && agencyCfg && agencyAwards) {
-            titleEl.textContent = agencyCfg.display_name + ': ' + agencyAwards.metric_label;
-            if (subtitleEl) {
-                subtitleEl.textContent = showCounts
-                    ? 'Cumulative new award count over the fiscal year.'
-                    : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
-            }
-        }
 
         // Show count toggle only for agencies with count data (NIH, NSF)
         const toggleContainer = document.getElementById('awards-toggle-container');
