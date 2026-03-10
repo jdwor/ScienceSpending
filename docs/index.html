@@ -235,9 +235,10 @@
                 <!-- New Awards Data Section -->
                 <div id="data-section-awards" class="data-section" style="display:none;">
                     <div class="methodology-note">
-                        <strong>Methodology.</strong> This section covers the pace of new grant-making at each agency, complementing the total obligation data drawn from SF-133 reports.
-                        Total obligations can appear normal even when new award activity has collapsed, because continuing grants, salaries, and contracts keep flowing.
-                        Tracking new awards separately reveals disruptions to the pipeline of new research funding.
+                        <strong>Methodology.</strong> New award data tracks the pace of grant-making&mdash;how many new grants are issued and
+                        how much new funding is committed&mdash;as distinct from total obligation figures, which include continuing grants,
+                        salaries, and contracts. Awards are drawn from agency-specific APIs and grant databases, filtered to new and
+                        competing-renewal grants, and normalized against discretionary appropriations to allow comparison across years and agencies.
 
                         <p><strong>NIH</strong> data comes from the <a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a>.
                         Awards are filtered to Type 1 (new) and Type 2 (competing renewal) grants, excluding subprojects.
@@ -280,7 +281,7 @@
                     <h2 class="section-heading" id="awards-data-summary-heading">Year-over-Year Comparison</h2>
                     <div class="table-wrapper">
                         <table id="table-awards-summary" class="data-table">
-                            <caption>Current fiscal year award totals compared to prior year and historical mean, as of the latest available date.</caption>
+                            <caption>Monthly cumulative new award dollars as a percentage of discretionary appropriation, compared to the prior year and historical mean.</caption>
                             <thead></thead>
                             <tbody></tbody>
                         </table>

@@ -783,6 +783,7 @@
             { key: 'source', label: 'Source', format: v => SOURCE_LABELS[v] || v },
             { key: 'count', label: 'Awards', format: v => v != null && v > 0 ? v.toLocaleString() : '\u2014', cls: 'number' },
             { key: 'dollars', label: 'Dollars', format: v => v != null ? formatDollars(v * 1e6) : '\u2014', cls: 'number' },
+            { key: 'pct_approp', label: '% of Approp', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
         ];
 
         thead.innerHTML = '<tr>' + cols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
@@ -802,6 +803,7 @@
                     source: agencyData.source_type,
                     count: yearData.cumulative_count[lastIdx],
                     dollars: yearData.cumulative_dollars_m[lastIdx],
+                    pct_approp: yearData.pct_of_approp ? yearData.pct_of_approp[lastIdx] : null,
                 });
             }
         }
@@ -822,44 +824,90 @@
     }
 
     function renderAwardsSummaryTable() {
+        const awards = DATA.awards;
         const summary = DATA.awards_summary;
         const cfg = DATA.config;
         const table = document.getElementById('table-awards-summary');
-        if (!table || !summary) return;
+        if (!table || !awards || !summary) return;
 
         const thead = table.querySelector('thead');
         const tbody = table.querySelector('tbody');
+
+        const monthLabels = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'];
+        const currentFY = cfg.current_fy;
+        const priorFY = currentFY - 1;
+
+        // Sample pct_of_approp at or before a target fy_day
+        function samplePct(yearData, targetDay) {
+            if (!yearData || !yearData.pct_of_approp) return null;
+            let idx = -1;
+            for (let i = 0; i < yearData.fy_days.length; i++) {
+                if (yearData.fy_days[i] <= targetDay) idx = i;
+                else break;
+            }
+            return idx >= 0 ? yearData.pct_of_approp[idx] : null;
+        }
+
+        // Sample from envelope mean array
+        function sampleEnvelopeMean(envelope, targetDay) {
+            if (!envelope || !envelope.fy_days || !envelope.mean) return null;
+            let idx = -1;
+            for (let i = 0; i < envelope.fy_days.length; i++) {
+                if (envelope.fy_days[i] <= targetDay) idx = i;
+                else break;
+            }
+            return idx >= 0 ? envelope.mean[idx] : null;
+        }
+
+        // Build monthly rows
+        const rows = [];
+        for (const [agencyKey, agencyData] of Object.entries(awards)) {
+            if (!cfg.agencies[agencyKey]) continue;
+            const summ = summary[agencyKey];
+            if (!summ) continue;
+            const latestDay = summ.latest_fy_day || 0;
+            const currentYearData = agencyData.years[String(currentFY)];
+            const priorYearData = agencyData.years[String(priorFY)];
+            const envelope = agencyData.envelope_pct;
+
+            for (let m = 1; m <= 12; m++) {
+                if (AWARDS_FY_MONTH_ENDS[m] > latestDay) break;
+                const endDay = AWARDS_FY_MONTH_ENDS[m];
+                const curPct = samplePct(currentYearData, endDay);
+                const priorPct = samplePct(priorYearData, endDay);
+                const meanPct = sampleEnvelopeMean(envelope, endDay);
+
+                rows.push({
+                    agency: agencyKey,
+                    month: monthLabels[m - 1],
+                    month_num: m,
+                    current_pct: curPct,
+                    prior_pct: priorPct,
+                    diff: (curPct != null && priorPct != null) ? curPct - priorPct : null,
+                    mean_pct: meanPct,
+                });
+            }
+        }
+
+        rows.sort((a, b) => {
+            const cmp = (a.agency || '').localeCompare(b.agency || '');
+            if (cmp !== 0) return cmp;
+            return a.month_num - b.month_num;
+        });
 
         const cols = [
             { key: 'agency', label: 'Agency', format: v => {
                 const a = cfg.agencies[v];
                 return a ? a.display_name : v;
             }},
-            { key: 'source_type', label: 'Source', format: v => SOURCE_LABELS[v] || v },
-            { key: 'latest_date', label: 'As Of', format: v => v || '\u2014' },
-            { key: 'cumul_count', label: `FY${cfg.current_fy} Awards`, format: v => v != null && v > 0 ? v.toLocaleString() : '\u2014', cls: 'number' },
-            { key: 'cumul_dollars', label: `FY${cfg.current_fy} Dollars`, format: v => v != null ? formatDollars(v) : '\u2014', cls: 'number' },
-            { key: 'prior_year_dollars', label: `FY${cfg.current_fy - 1} Dollars`, format: v => v != null ? formatDollars(v) : '\u2014', cls: 'number' },
-            { key: '_pct_prior_dollars', label: '% of Prior Yr', format: (v, row) => {
-                if (row.prior_year_dollars && row.prior_year_dollars > 0) {
-                    return (row.cumul_dollars / row.prior_year_dollars * 100).toFixed(0) + '%';
-                }
-                return '\u2014';
-            }, cls: 'number' },
-            { key: 'mean_dollars', label: 'Mean Dollars', format: v => v != null ? formatDollars(v) : '\u2014', cls: 'number' },
-            { key: '_pct_mean_dollars', label: '% of Mean', format: (v, row) => {
-                if (row.mean_dollars && row.mean_dollars > 0) {
-                    return (row.cumul_dollars / row.mean_dollars * 100).toFixed(0) + '%';
-                }
-                return '\u2014';
-            }, cls: 'number' },
+            { key: 'month', label: 'Month', format: v => v },
+            { key: 'current_pct', label: `FY${currentFY}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
+            { key: 'prior_pct', label: `FY${priorFY}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
+            { key: 'diff', label: 'Diff (pp)', format: v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) : '\u2014', cls: 'number' },
+            { key: 'mean_pct', label: 'Mean', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
         ];
 
         thead.innerHTML = '<tr>' + cols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
-
-        const rows = Object.entries(summary)
-            .map(([key, row]) => Object.assign({ agency: key }, row))
-            .sort((a, b) => (a.agency || '').localeCompare(b.agency || ''));
 
         tbody.innerHTML = rows.map(row =>
             '<tr>' + cols.map(c => {
