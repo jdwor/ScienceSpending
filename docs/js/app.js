@@ -255,7 +255,7 @@
                 name: agency.display_name,
                 line: { color: agency.color, width: 2.5 },
                 marker: { size: 5, color: agency.color },
-                hovertemplate: '<b>' + agency.display_name + '</b><br>%{text}: %{y:.1f}% of mean pace<extra></extra>',
+                hovertemplate: '<b>' + agency.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agency.color },
             });
         }
@@ -270,7 +270,7 @@
         // Set HTML chart title
         const titleEl = document.getElementById('overview-chart-title');
         if (titleEl) {
-            titleEl.textContent = `FY${cfg.current_fy} Obligation Pace vs. ${bandLabel} Mean`;
+            titleEl.textContent = `FY${cfg.current_fy} Obligation Pace vs. ${bandLabel} Average`;
         }
 
         const layout = {
@@ -286,7 +286,7 @@
                 ticksuffix: '%',
                 range: [-6, 200],
                 dtick: 20,
-                title: { text: '% of Mean Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -308,7 +308,7 @@
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
-                    text: bandLabel + ' mean',
+                    text: bandLabel + ' avg.',
                     x: 12,
                     y: 100,
                     xanchor: 'right',
@@ -374,7 +374,7 @@
                 });
 
                 const medLabel = bandFys.length > 1
-                    ? `FY${bandFys[0]}\u2013${bandFys[bandFys.length - 1]} mean`
+                    ? `FY${bandFys[0]}\u2013${bandFys[bandFys.length - 1]} avg.`
                     : `FY${bandFys[0]}`;
 
                 traces.push({
@@ -384,7 +384,7 @@
                     line: { color: '#b0bac8', width: 1.5, dash: 'dot' },
                     showlegend: true,
                     name: medLabel,
-                    hovertemplate: '<b>Mean</b>: %{y:.1f}' + (showPct ? '%' : 'B') + '<extra></extra>',
+                    hovertemplate: '<b>Avg.</b>: %{y:.1f}' + (showPct ? '%' : 'B') + '<extra></extra>',
                 });
             }
         }
@@ -586,7 +586,7 @@
             card(`Obligated through ${summary.latest_period}`, formatDollars(summary.obligations_to_date)) +
             card('Percent Obligated', pctStr) +
             card(`vs. FY${cfg.current_fy - 1}`, yoyStr, null, yoyDir) +
-            card('vs. Mean', medStr, null, medDir);
+            card('vs. Avg.', medStr, null, medDir);
 
         const cards = container.querySelectorAll('.metric-card');
         if (cards[3] && yoyDir) {
@@ -749,7 +749,7 @@
             { key: 'current_pct', label: `FY${cfg.current_fy}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
             { key: 'prior_year_pct', label: `FY${cfg.current_fy - 1}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
             { key: 'yoy_diff', label: 'Diff (pp)', format: v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) : '\u2014', cls: 'number' },
-            { key: 'mean_prior_pct', label: 'Mean', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
+            { key: 'mean_prior_pct', label: 'Avg.', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
         ];
 
         yoyHead.innerHTML = '<tr>' + yoyCols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
@@ -904,7 +904,7 @@
             { key: 'current_pct', label: `FY${currentFY}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
             { key: 'prior_pct', label: `FY${priorFY}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
             { key: 'diff', label: 'Diff (pp)', format: v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) : '\u2014', cls: 'number' },
-            { key: 'mean_pct', label: 'Mean', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
+            { key: 'mean_pct', label: 'Avg.', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
         ];
 
         thead.innerHTML = '<tr>' + cols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
@@ -1093,7 +1093,7 @@
                 line: { color: agencyCfg.color, width: 2.5 },
                 marker: { size: isDaily ? 4 : 5, color: agencyCfg.color },
                 text: plotX.map(d => fyDayToMonth(d)),
-                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of mean pace<extra></extra>',
+                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agencyCfg.color },
             });
         }
@@ -1101,7 +1101,7 @@
         // Set HTML chart title
         const awardsTitleEl = document.getElementById('awards-multi-title');
         if (awardsTitleEl) {
-            awardsTitleEl.textContent = `FY${currentFy} Award-Making Pace vs. Historical Mean`;
+            awardsTitleEl.textContent = `FY${currentFy} Award-Making Pace vs. Historical Average`;
         }
 
         const layout = {
@@ -1116,7 +1116,7 @@
                 ticksuffix: '%',
                 range: [-6, 200],
                 dtick: 20,
-                title: { text: '% of Mean Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -1138,7 +1138,7 @@
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
-                    text: 'Historical mean',
+                    text: 'Historical avg.',
                     x: 365,
                     y: 100,
                     xanchor: 'right',
@@ -1216,7 +1216,7 @@
                 });
 
                 const medLabel = bandFys.length > 1
-                    ? `FY${bandFys[0]}\u2013${bandFys[bandFys.length - 1]} mean`
+                    ? `FY${bandFys[0]}\u2013${bandFys[bandFys.length - 1]} avg.`
                     : `FY${bandFys[0]}`;
 
                 traces.push({
@@ -1226,8 +1226,8 @@
                     line: { color: '#b0bac8', width: 1.5, dash: 'dot' },
                     showlegend: true,
                     name: medLabel,
-                    hovertemplate: isPct ? '<b>Mean</b>: %{y:.2f}%<extra></extra>'
-                        : '<b>Mean</b>: %{y:,.0f}<extra></extra>',
+                    hovertemplate: isPct ? '<b>Avg.</b>: %{y:.2f}%<extra></extra>'
+                        : '<b>Avg.</b>: %{y:,.0f}<extra></extra>',
                 });
             }
         }
@@ -1441,7 +1441,7 @@
             medStr = diffSign + diff.toFixed(1) + 'pp (' + relSign + rel.toFixed(1) + '%)';
             medDir = diff < 0 ? 'negative' : 'positive';
         }
-        html += card('vs. Mean', medStr, null, medDir);
+        html += card('vs. Avg.', medStr, null, medDir);
 
         // Card 6: Award count (NIH/NSF only — inherently normalized)
         if (hasCounts && summ.cumul_count) {
@@ -1450,7 +1450,7 @@
             let countDelta = '';
             let countDir = '';
             if (meanCount != null && summ.mean_count) {
-                countDelta = 'vs. mean of ' + meanCount;
+                countDelta = 'vs. avg. of ' + meanCount;
                 countDir = summ.cumul_count < summ.mean_count ? 'negative' : 'positive';
             }
             html += card(`FY${cfg.current_fy} Awards`, count, countDelta, countDir);
