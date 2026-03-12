@@ -1046,6 +1046,7 @@
             const isDaily = agencyAwards.source_type !== 'usaspending';
             let plotX = xVals;
             let plotY = yVals;
+            let tailX = null, tailY = null;
             if (isDaily && xVals.length > 14) {
                 // Build target days: month boundaries + quartiles within each month
                 const targets = [];
@@ -1057,7 +1058,7 @@
                     targets.push(Math.round(s + (e - s) * 0.5));
                     targets.push(Math.round(s + (e - s) * 0.75));
                 }
-                // Interpolate at each target day, plus always keep the last point
+                // Interpolate at each target milestone day
                 plotX = [];
                 plotY = [];
                 for (const t of targets) {
@@ -1077,11 +1078,12 @@
                         plotY.push(yVals[lo] + frac * (yVals[hi] - yVals[lo]));
                     }
                 }
-                // Always include the latest data point
+                // If latest data extends past the last milestone, add a line-only tail
                 const lastX = xVals[xVals.length - 1];
-                if (plotX[plotX.length - 1] !== lastX) {
-                    plotX.push(lastX);
-                    plotY.push(yVals[yVals.length - 1]);
+                const lastY = yVals[yVals.length - 1];
+                if (plotX.length > 0 && plotX[plotX.length - 1] !== lastX) {
+                    tailX = [plotX[plotX.length - 1], lastX];
+                    tailY = [plotY[plotY.length - 1], lastY];
                 }
             }
 
@@ -1096,6 +1098,20 @@
                 hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agencyCfg.color },
             });
+            // Line-only tail extending beyond last milestone (no dot)
+            if (tailX) {
+                traces.push({
+                    x: tailX,
+                    y: tailY,
+                    mode: 'lines',
+                    name: agencyCfg.display_name,
+                    line: { color: agencyCfg.color, width: 2.5 },
+                    text: tailX.map(d => fyDayToMonth(d)),
+                    hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                    hoverlabel: { bordercolor: agencyCfg.color },
+                    showlegend: false,
+                });
+            }
         }
 
         // Set HTML chart title
