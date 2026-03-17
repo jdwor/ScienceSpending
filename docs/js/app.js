@@ -430,7 +430,7 @@
                     line: { color: '#b0bac8', width: 1.5, dash: 'dot' },
                     showlegend: true,
                     name: medLabel,
-                    hovertemplate: '<b>Avg.</b>: %{y:.1f}' + (showPct ? '%' : 'B') + '<extra></extra>',
+                    hovertemplate: showPct ? '<b>Avg.</b>: %{y:.1f}% obligated<extra></extra>' : '<b>Avg.</b>: $%{y:.1f}B<extra></extra>',
                 });
             }
         }
@@ -1225,13 +1225,14 @@
                     line: { color: '#b0bac8', width: 1.5, dash: 'dot' },
                     showlegend: true,
                     name: medLabel,
-                    hovertemplate: isPct ? '<b>Avg.</b>: %{y:.2f}%<extra></extra>'
-                        : '<b>Avg.</b>: %{y:,.0f}<extra></extra>',
+                    hovertemplate: isPct ? '<b>Avg.</b>: %{y:.2f}% of approp<extra></extra>'
+                        : isDollars ? '<b>Avg.</b>: $%{y:,.0f}M awarded<extra></extra>'
+                        : '<b>Avg.</b>: %{y:,.0f} awards<extra></extra>',
                 });
             }
         }
 
-        const hoverFmt = isPct ? '%{y:.2f}% of approp' : isDollars ? '$%{y:,.0f}M' : '%{y:,.0f}';
+        const hoverFmt = isPct ? '%{y:.2f}% of approp' : isDollars ? '$%{y:,.0f}M awarded' : '%{y:,.0f} awards';
 
         // Daily sources (NIH, NSF) have many points — use lines only, no markers
         const isDaily = agencyAwards.source_type !== 'usaspending';
