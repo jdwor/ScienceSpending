@@ -100,13 +100,13 @@
     }
 
     function sourceAnnotation(text, yOffset) {
-        var defaultY = isMobile() ? -0.38 : -0.28;
+        if (isMobile()) return null;
         return {
             text: text || "Source: OMB SF-133",
             xref: 'paper',
             yref: 'paper',
             x: 1,
-            y: yOffset || defaultY,
+            y: yOffset || -0.28,
             xanchor: 'right',
             yanchor: 'top',
             showarrow: false,
@@ -351,7 +351,7 @@
             plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
             height: 460,
-            margin: { l: 60, r: 12, t: 8, b: isMobile() ? 110 : 95 },
+            margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
                     text: bandLabel + ' avg.',
@@ -365,7 +365,7 @@
                 },
                 sourceAnnotation("Source: OMB SF-133", -0.30),
                 ...obligationMonthLabels(false),
-            ],
+            ].filter(Boolean),
         };
 
         Plotly.newPlot('chart-multi-agency', traces, layout, plotlyConfigCompact());
@@ -490,7 +490,7 @@
             : 'Cumulative obligations in billions of dollars by fiscal year month.';
         const detailTitle = agency.display_name + ' \u2014 Obligation Spend-Down'
             + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
-        const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")];
+        const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")].filter(Boolean);
         annotations.push(...obligationMonthLabels(compact));
 
         const layout = {
@@ -543,7 +543,7 @@
                 l: compact ? 45 : 60,
                 r: 12,
                 t: compact ? 38 : 72,
-                b: compact ? 65 : (isMobile() ? 125 : 110),
+                b: compact ? 65 : 110,
             },
             annotations: annotations,
         };
@@ -1131,7 +1131,7 @@
             plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
             height: 460,
-            margin: { l: 60, r: 12, t: 8, b: isMobile() ? 110 : 95 },
+            margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
                     text: 'Historical avg.',
@@ -1145,7 +1145,7 @@
                 },
                 sourceAnnotation('Source: NIH Reporter, NSF Awards, USASpending', -0.30),
                 ...awardMonthLabels(false),
-            ],
+            ].filter(Boolean),
         };
 
         Plotly.newPlot('chart-awards-multi', traces, layout, plotlyConfigCompact());
@@ -1277,7 +1277,7 @@
 
         const height = compact ? 310 : 500;
         const sourceLabel = SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type;
-        const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel)];
+        const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel)].filter(Boolean);
 
         const awardYLabel = isPct ? '% of Appropriation Awarded' : isDollars ? 'Cumulative Awards ($M)' : 'Cumulative Award Count';
         const awardsDetailSubtitle = mode === 'counts'
@@ -1338,7 +1338,7 @@
                 l: compact ? 45 : 60,
                 r: 12,
                 t: compact ? 38 : 72,
-                b: compact ? 65 : (isMobile() ? 125 : 110),
+                b: compact ? 65 : 110,
             },
             annotations: awardAnnotations,
         };
