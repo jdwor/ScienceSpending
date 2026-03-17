@@ -8,10 +8,10 @@
     // ── Shared chart styling ──
     const FONT_SANS = "Inter, -apple-system, BlinkMacSystemFont, sans-serif";
     const FONT_SERIF = "Source Serif 4, Georgia, serif";
-    const TEXT_COLOR = "#111827";
+    const TEXT_COLOR = "#0f1419";
     const MUTED_COLOR = "#6b7280";
-    const GRID_COLOR = "rgba(0,0,0,0.04)";
-    const AXIS_LINE_COLOR = "#e5e7eb";
+    const GRID_COLOR = "rgba(217,214,208,0.15)";
+    const AXIS_LINE_COLOR = "#d9d6d0";
     const PRIOR_RANGE_COLOR = "rgba(160, 175, 200, 0.15)";
     const HIGHLIGHT_COLORS = { 2025: "#94a3b8" };
 
@@ -26,6 +26,26 @@
     let DATA = null;
 
     // ── Utilities ──
+
+    // ── Segmented Control Helpers ──
+
+    function initSegmentedControl(containerId, callback) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.querySelectorAll('.seg-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+                container.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                callback(btn.dataset.mode);
+            });
+        });
+    }
+
+    function getActiveMode(containerId) {
+        const active = document.querySelector('#' + containerId + ' .seg-btn.active');
+        return active ? active.dataset.mode : 'pct';
+    }
 
     function formatDollars(amount) {
         if (amount == null) return "N/A";
@@ -57,9 +77,12 @@
 
     function obligationMonthLabels(compact) {
         // Month name annotations centered between boundary ticks.
+        // On mobile, show only every other month to avoid crowding.
         const labels = fyMonthLabels();
+        const mobile = isMobile();
         const annots = [];
         for (let i = 1; i <= 12; i++) {
+            if (mobile && !compact && i % 2 === 0) continue;
             annots.push({
                 text: labels[i],
                 x: i - 0.5,
@@ -70,25 +93,29 @@
                 yshift: -4,
                 xanchor: 'center',
                 showarrow: false,
-                font: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
+                font: { family: FONT_SANS, size: compact ? 10 : (mobile ? 9 : 11), color: MUTED_COLOR },
             });
         }
         return annots;
     }
 
     function sourceAnnotation(text, yOffset) {
+        var defaultY = isMobile() ? -0.38 : -0.28;
         return {
             text: text || "Source: OMB SF-133",
             xref: 'paper',
             yref: 'paper',
             x: 1,
-            y: yOffset || -0.28,
+            y: yOffset || defaultY,
             xanchor: 'right',
             yanchor: 'top',
             showarrow: false,
             font: { family: FONT_SANS, size: 9, color: '#9ca3af' },
         };
     }
+
+    // Mobile detection
+    function isMobile() { return window.innerWidth < 768; }
 
     // Plotly config for full-size charts (shows camera icon on hover)
     const PLOTLY_CONFIG_EXPORT = {
@@ -104,16 +131,35 @@
             scale: 2,
         },
         responsive: true,
+        scrollZoom: false,
     };
 
-    // Plotly config for small multiples (no mode bar)
-    const PLOTLY_CONFIG_COMPACT = { displayModeBar: false, responsive: true };
+    // Plotly config for small multiples (no mode bar, no drag-zoom on mobile)
+    function plotlyConfigCompact() {
+        return {
+            displayModeBar: false,
+            responsive: true,
+            scrollZoom: false,
+            staticPlot: isMobile(),
+        };
+    }
+
+    // Plotly config for full-size charts on mobile (no drag-zoom)
+    function plotlyConfigFull() {
+        var cfg = Object.assign({}, PLOTLY_CONFIG_EXPORT);
+        if (isMobile()) {
+            cfg.staticPlot = true;
+        }
+        return cfg;
+    }
 
     function baseAxisStyle() {
         return {
             gridcolor: GRID_COLOR,
             zeroline: false,
-            showline: false,
+            showline: true,
+            linecolor: AXIS_LINE_COLOR,
+            linewidth: 1,
             tickfont: { family: FONT_SANS, size: 11, color: MUTED_COLOR },
         };
     }
@@ -299,13 +345,13 @@
             hovermode: 'closest',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#e5e7eb',
+                bordercolor: '#d9d6d0',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
-            plot_bgcolor: 'white',
+            plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
             height: 460,
-            margin: { l: 60, r: 12, t: 8, b: 95 },
+            margin: { l: 60, r: 12, t: 8, b: isMobile() ? 110 : 95 },
             annotations: [
                 {
                     text: bandLabel + ' avg.',
@@ -322,7 +368,7 @@
             ],
         };
 
-        Plotly.newPlot('chart-multi-agency', traces, layout, PLOTLY_CONFIG_COMPACT);
+        Plotly.newPlot('chart-multi-agency', traces, layout, plotlyConfigCompact());
     }
 
     // ── Single-Agency Spend-Down Chart ──
@@ -437,7 +483,7 @@
         }
         const yBuffer = Math.max(yMax * 0.03, 0.1);
 
-        const height = compact ? 340 : 500;
+        const height = compact ? 310 : 500;
         const yAxisLabel = showPct ? '% of Appropriation Obligated' : 'Cumulative Obligations ($B)';
         const detailSubtitle = showPct
             ? 'Cumulative obligations as a percentage of full-year appropriations.'
@@ -484,25 +530,25 @@
                 font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR },
                 bgcolor: 'rgba(0,0,0,0)',
             },
-            hovermode: 'x unified',
+            hovermode: compact ? 'closest' : 'x unified',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#e5e7eb',
+                bordercolor: '#d9d6d0',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
-            plot_bgcolor: 'white',
+            plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
             height: height,
             margin: {
                 l: compact ? 45 : 60,
                 r: 12,
                 t: compact ? 38 : 72,
-                b: compact ? 65 : 110,
+                b: compact ? 65 : (isMobile() ? 125 : 110),
             },
             annotations: annotations,
         };
 
-        Plotly.newPlot(targetDiv, traces, layout, compact ? PLOTLY_CONFIG_COMPACT : PLOTLY_CONFIG_EXPORT);
+        Plotly.newPlot(targetDiv, traces, layout, compact ? plotlyConfigCompact() : plotlyConfigFull());
     }
 
     // ── Small Multiples ──
@@ -602,11 +648,11 @@
     function renderAgencyDetail() {
         const select = document.getElementById('agency-select');
         const agencyKey = select.value;
-        const showDollars = document.getElementById('toggle-dollars').checked;
-        const agency = DATA.config.agencies[agencyKey];
+        const mode = getActiveMode('obligations-view-mode');
+        const showPct = mode === 'pct';
 
         renderMetrics(agencyKey);
-        renderSpenddownChart(agencyKey, 'chart-agency-detail', !showDollars, false);
+        renderSpenddownChart(agencyKey, 'chart-agency-detail', showPct, false);
     }
 
     function initAgencySelect() {
@@ -622,7 +668,7 @@
         }
 
         select.addEventListener('change', renderAgencyDetail);
-        document.getElementById('toggle-dollars').addEventListener('change', renderAgencyDetail);
+        initSegmentedControl('obligations-view-mode', function() { renderAgencyDetail(); });
     }
 
     // ── Export Buttons ──
@@ -701,221 +747,152 @@
 
     function renderTables() {
         const cfg = DATA.config;
-        const tables = DATA.tables;
 
-        // Appropriations summary
-        const appropTable = document.getElementById('table-approp');
-        const appropHead = appropTable.querySelector('thead');
-        const appropBody = appropTable.querySelector('tbody');
+        // Obligation time series — complete data for chart reproduction
+        const table = document.getElementById('table-obligations-series');
+        if (!table) return;
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        const labels = fyMonthLabels();
 
-        const appropCols = [
+        const cols = [
             { key: 'agency', label: 'Agency', format: v => cfg.agencies[v] ? cfg.agencies[v].display_name : v },
-            { key: 'fiscal_year', label: 'FY', format: v => v },
-            { key: 'approp_disc_raw', label: 'Disc. Approp', format: formatDollars, cls: 'number' },
-            { key: 'approp_mand_raw', label: 'Mand. Approp', format: formatDollars, cls: 'number' },
-            { key: 'approp_disc_net', label: 'Net Disc.', format: formatDollars, cls: 'number' },
-            { key: 'budget_authority', label: 'Budget Auth.', format: formatDollars, cls: 'number' },
-            { key: 'obligations_total', label: 'Obligations', format: formatDollars, cls: 'number' },
-            { key: 'outlays_net', label: 'Outlays', format: formatDollars, cls: 'number' },
+            { key: 'fy', label: 'FY', format: v => v, cls: 'number' },
+            { key: 'month', label: 'Month', format: v => labels[v] || v },
+            { key: 'obligations', label: 'Obligations ($)', format: v => v != null ? formatDollars(v * 1e9) : '\u2014', cls: 'number' },
+            { key: 'appropriations', label: 'Appropriation ($)', format: v => v != null ? formatDollars(v * 1e9) : '\u2014', cls: 'number' },
+            { key: 'pct', label: '% Obligated', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
         ];
 
-        appropHead.innerHTML = '<tr>' + appropCols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
+        thead.innerHTML = '<tr>' + cols.map(c => '<th>' + c.label + '</th>').join('') + '</tr>';
 
-        const appropRows = [...tables.approp_summary].sort((a, b) => {
-            const agencyCmp = (a.agency || '').localeCompare(b.agency || '');
-            if (agencyCmp !== 0) return agencyCmp;
-            return (b.fiscal_year || 0) - (a.fiscal_year || 0);
+        // Build rows from spenddown data
+        const rows = [];
+        for (const [agencyKey, agencyData] of Object.entries(DATA.spenddown)) {
+            if (!cfg.agencies[agencyKey]) continue;
+            // Get appropriation from summaries
+            const summary = DATA.summaries[agencyKey];
+            const approp = summary ? summary.appropriations : null;
+            for (const [fy, yearData] of Object.entries(agencyData.years)) {
+                for (let i = 0; i < yearData.months.length; i++) {
+                    if (yearData.months[i] === 1 && yearData.pct[i] === 0) continue; // skip anchor
+                    rows.push({
+                        agency: agencyKey,
+                        fy: parseInt(fy),
+                        month: yearData.months[i],
+                        obligations: yearData.dollars_b[i],
+                        appropriations: approp != null ? approp / 1e9 : null,
+                        pct: yearData.pct[i],
+                    });
+                }
+            }
+        }
+
+        rows.sort(function(a, b) {
+            var cmp = (a.agency || '').localeCompare(b.agency || '');
+            if (cmp !== 0) return cmp;
+            cmp = a.fy - b.fy;
+            if (cmp !== 0) return cmp;
+            return a.month - b.month;
         });
 
-        appropBody.innerHTML = appropRows.map(row =>
-            '<tr>' + appropCols.map(c => {
-                const val = row[c.key];
-                const formatted = val != null ? c.format(val) : '\u2014';
-                return `<td class="${c.cls || ''}">${formatted}</td>`;
-            }).join('') + '</tr>'
-        ).join('');
-
-        // YoY comparison
-        const yoyTable = document.getElementById('table-yoy');
-        const yoyHead = yoyTable.querySelector('thead');
-        const yoyBody = yoyTable.querySelector('tbody');
-
-        const yoyHeading = document.getElementById('yoy-heading');
-        yoyHeading.textContent = `Year-over-Year Comparison`;
-
-        const yoyCols = [
-            { key: 'display_name', label: 'Agency', format: v => v },
-            { key: 'period_label', label: 'Period', format: v => v },
-            { key: 'current_pct', label: `FY${cfg.current_fy}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
-            { key: 'prior_year_pct', label: `FY${cfg.current_fy - 1}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
-            { key: 'yoy_diff', label: 'Diff (pp)', format: v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) : '\u2014', cls: 'number' },
-            { key: 'mean_prior_pct', label: 'Avg.', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
-        ];
-
-        yoyHead.innerHTML = '<tr>' + yoyCols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
-
-        yoyBody.innerHTML = tables.yoy_comparison.map(row =>
-            '<tr>' + yoyCols.map(c => {
-                const val = row[c.key];
-                const formatted = val != null ? c.format(val) : '\u2014';
-                return `<td class="${c.cls || ''}">${formatted}</td>`;
-            }).join('') + '</tr>'
-        ).join('');
+        tbody.innerHTML = rows.map(function(row) {
+            return '<tr>' + cols.map(function(c) {
+                var val = row[c.key];
+                var formatted = val != null ? c.format(val) : '\u2014';
+                return '<td class="' + (c.cls || '') + '">' + formatted + '</td>';
+            }).join('') + '</tr>';
+        }).join('');
     }
 
     // ── Awards Data Tables ──
 
-    function renderAwardsAnnualTable() {
+    function renderAwardsSeriesTable() {
         const awards = DATA.awards;
         const cfg = DATA.config;
-        const table = document.getElementById('table-awards-annual');
+        const table = document.getElementById('table-awards-series');
         if (!table || !awards) return;
 
         const thead = table.querySelector('thead');
         const tbody = table.querySelector('tbody');
 
         const cols = [
-            { key: 'agency', label: 'Agency', format: v => {
-                const a = cfg.agencies[v];
-                return a ? a.display_name : v;
-            }},
-            { key: 'fiscal_year', label: 'FY', format: v => v },
-            { key: 'source', label: 'Source', format: v => SOURCE_LABELS[v] || v },
-            { key: 'count', label: 'Awards', format: v => v != null && v > 0 ? v.toLocaleString() : '\u2014', cls: 'number' },
-            { key: 'dollars', label: 'Dollars', format: v => v != null ? formatDollars(v * 1e6) : '\u2014', cls: 'number' },
-            { key: 'pct_approp', label: '% of Approp', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
+            { key: 'agency', label: 'Agency', format: function(v) { var a = cfg.agencies[v]; return a ? a.display_name : v; } },
+            { key: 'fiscal_year', label: 'FY', format: function(v) { return v; }, cls: 'number' },
+            { key: 'date', label: 'Date', format: function(v) { return v; } },
+            { key: 'fy_day', label: 'FY Day', format: function(v) { return v; }, cls: 'number' },
+            { key: 'count', label: 'Cumul. Awards', format: function(v) { return v != null && v > 0 ? v.toLocaleString() : '\u2014'; }, cls: 'number' },
+            { key: 'dollars_m', label: 'Cumul. Dollars ($M)', format: function(v) { return v != null ? '$' + v.toFixed(1) + 'M' : '\u2014'; }, cls: 'number' },
+            { key: 'pct_approp', label: '% of Approp', format: function(v) { return v != null ? v.toFixed(2) + '%' : '\u2014'; }, cls: 'number' },
         ];
 
-        thead.innerHTML = '<tr>' + cols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
+        thead.innerHTML = '<tr>' + cols.map(function(c) { return '<th>' + c.label + '</th>'; }).join('') + '</tr>';
 
-        // Build rows from awards year traces (end-of-year values)
-        const rows = [];
-        for (const [agencyKey, agencyData] of Object.entries(awards)) {
+        // Build rows from all year traces, sampling at month boundaries for daily data
+        var rows = [];
+        for (var agencyKey in awards) {
             if (!cfg.agencies[agencyKey]) continue;
-            for (const fy of agencyData.fiscal_years) {
-                const yearData = agencyData.years[String(fy)];
+            var agencyData = awards[agencyKey];
+            var isDaily = agencyData.source_type !== 'usaspending';
+
+            for (var fi = 0; fi < agencyData.fiscal_years.length; fi++) {
+                var fy = agencyData.fiscal_years[fi];
+                var yearData = agencyData.years[String(fy)];
                 if (!yearData) continue;
-                const lastIdx = yearData.fy_days.length - 1;
-                if (lastIdx < 0) continue;
-                rows.push({
-                    agency: agencyKey,
-                    fiscal_year: fy,
-                    source: agencyData.source_type,
-                    count: yearData.cumulative_count[lastIdx],
-                    dollars: yearData.cumulative_dollars_m[lastIdx],
-                    pct_approp: yearData.pct_of_approp ? yearData.pct_of_approp[lastIdx] : null,
-                });
+
+                if (isDaily && yearData.fy_days.length > 24) {
+                    // Sample at month boundaries to keep table manageable
+                    for (var m = 1; m <= 12; m++) {
+                        var targetDay = AWARDS_FY_MONTH_ENDS[m];
+                        var idx = -1;
+                        for (var k = 0; k < yearData.fy_days.length; k++) {
+                            if (yearData.fy_days[k] <= targetDay) idx = k;
+                            else break;
+                        }
+                        if (idx < 0) continue;
+                        rows.push({
+                            agency: agencyKey,
+                            fiscal_year: fy,
+                            date: yearData.dates[idx],
+                            fy_day: yearData.fy_days[idx],
+                            count: yearData.cumulative_count ? yearData.cumulative_count[idx] : null,
+                            dollars_m: yearData.cumulative_dollars_m[idx],
+                            pct_approp: yearData.pct_of_approp ? yearData.pct_of_approp[idx] : null,
+                        });
+                    }
+                } else {
+                    // Monthly data — include all points
+                    for (var i = 0; i < yearData.fy_days.length; i++) {
+                        if (yearData.fy_days[i] === 1 && yearData.cumulative_dollars_m[i] === 0) continue;
+                        rows.push({
+                            agency: agencyKey,
+                            fiscal_year: fy,
+                            date: yearData.dates[i],
+                            fy_day: yearData.fy_days[i],
+                            count: yearData.cumulative_count ? yearData.cumulative_count[i] : null,
+                            dollars_m: yearData.cumulative_dollars_m[i],
+                            pct_approp: yearData.pct_of_approp ? yearData.pct_of_approp[i] : null,
+                        });
+                    }
+                }
             }
         }
 
-        rows.sort((a, b) => {
-            const cmp = (a.agency || '').localeCompare(b.agency || '');
+        rows.sort(function(a, b) {
+            var cmp = (a.agency || '').localeCompare(b.agency || '');
             if (cmp !== 0) return cmp;
-            return (b.fiscal_year || 0) - (a.fiscal_year || 0);
+            cmp = a.fiscal_year - b.fiscal_year;
+            if (cmp !== 0) return cmp;
+            return a.fy_day - b.fy_day;
         });
 
-        tbody.innerHTML = rows.map(row =>
-            '<tr>' + cols.map(c => {
-                const val = row[c.key];
-                const formatted = c.format(val, row);
-                return `<td class="${c.cls || ''}">${formatted}</td>`;
-            }).join('') + '</tr>'
-        ).join('');
-    }
-
-    function renderAwardsSummaryTable() {
-        const awards = DATA.awards;
-        const summary = DATA.awards_summary;
-        const cfg = DATA.config;
-        const table = document.getElementById('table-awards-summary');
-        if (!table || !awards || !summary) return;
-
-        const thead = table.querySelector('thead');
-        const tbody = table.querySelector('tbody');
-
-        const monthLabels = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'];
-        const currentFY = cfg.current_fy;
-        const priorFY = currentFY - 1;
-
-        // Sample pct_of_approp at or before a target fy_day
-        function samplePct(yearData, targetDay) {
-            if (!yearData || !yearData.pct_of_approp) return null;
-            let idx = -1;
-            for (let i = 0; i < yearData.fy_days.length; i++) {
-                if (yearData.fy_days[i] <= targetDay) idx = i;
-                else break;
-            }
-            return idx >= 0 ? yearData.pct_of_approp[idx] : null;
-        }
-
-        // Sample from envelope mean array
-        function sampleEnvelopeMean(envelope, targetDay) {
-            if (!envelope || !envelope.fy_days || !envelope.mean) return null;
-            let idx = -1;
-            for (let i = 0; i < envelope.fy_days.length; i++) {
-                if (envelope.fy_days[i] <= targetDay) idx = i;
-                else break;
-            }
-            return idx >= 0 ? envelope.mean[idx] : null;
-        }
-
-        // Build monthly rows
-        const rows = [];
-        for (const [agencyKey, agencyData] of Object.entries(awards)) {
-            if (!cfg.agencies[agencyKey]) continue;
-            const summ = summary[agencyKey];
-            if (!summ) continue;
-            const latestDay = summ.latest_fy_day || 0;
-            const currentYearData = agencyData.years[String(currentFY)];
-            const priorYearData = agencyData.years[String(priorFY)];
-            const envelope = agencyData.envelope_pct;
-
-            for (let m = 1; m <= 12; m++) {
-                if (AWARDS_FY_MONTH_ENDS[m] > latestDay) break;
-                const endDay = AWARDS_FY_MONTH_ENDS[m];
-                const curPct = samplePct(currentYearData, endDay);
-                const priorPct = samplePct(priorYearData, endDay);
-                const meanPct = sampleEnvelopeMean(envelope, endDay);
-
-                rows.push({
-                    agency: agencyKey,
-                    month: monthLabels[m - 1],
-                    month_num: m,
-                    current_pct: curPct,
-                    prior_pct: priorPct,
-                    diff: (curPct != null && priorPct != null) ? curPct - priorPct : null,
-                    mean_pct: meanPct,
-                });
-            }
-        }
-
-        rows.sort((a, b) => {
-            const cmp = (a.agency || '').localeCompare(b.agency || '');
-            if (cmp !== 0) return cmp;
-            return a.month_num - b.month_num;
-        });
-
-        const cols = [
-            { key: 'agency', label: 'Agency', format: v => {
-                const a = cfg.agencies[v];
-                return a ? a.display_name : v;
-            }},
-            { key: 'month', label: 'Month', format: v => v },
-            { key: 'current_pct', label: `FY${currentFY}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
-            { key: 'prior_pct', label: `FY${priorFY}`, format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
-            { key: 'diff', label: 'Diff (pp)', format: v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) : '\u2014', cls: 'number' },
-            { key: 'mean_pct', label: 'Avg.', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
-        ];
-
-        thead.innerHTML = '<tr>' + cols.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
-
-        tbody.innerHTML = rows.map(row =>
-            '<tr>' + cols.map(c => {
-                const val = row[c.key];
-                const formatted = c.format(val, row);
-                return `<td class="${c.cls || ''}">${formatted}</td>`;
-            }).join('') + '</tr>'
-        ).join('');
+        tbody.innerHTML = rows.map(function(row) {
+            return '<tr>' + cols.map(function(c) {
+                var val = row[c.key];
+                var formatted = c.format(val);
+                return '<td class="' + (c.cls || '') + '">' + formatted + '</td>';
+            }).join('') + '</tr>';
+        }).join('');
     }
 
     // ── Awards: FY Day Ticks ──
@@ -945,9 +922,12 @@
 
     function awardMonthLabels(compact) {
         // Month name annotations centered between boundary ticks.
+        // On mobile, show only every other month to avoid crowding.
         const labels = fyMonthLabels();
+        const mobile = isMobile();
         const annots = [];
         for (let i = 1; i <= 12; i++) {
+            if (mobile && !compact && i % 2 === 0) continue;
             annots.push({
                 text: labels[i],
                 x: (AWARDS_FY_MONTH_DAYS[i] + AWARDS_FY_MONTH_ENDS[i]) / 2,
@@ -958,7 +938,7 @@
                 yshift: -4,
                 xanchor: 'center',
                 showarrow: false,
-                font: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
+                font: { family: FONT_SANS, size: compact ? 10 : (mobile ? 9 : 11), color: MUTED_COLOR },
             });
         }
         return annots;
@@ -1145,13 +1125,13 @@
             hovermode: 'closest',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#e5e7eb',
+                bordercolor: '#d9d6d0',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
-            plot_bgcolor: 'white',
+            plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
             height: 460,
-            margin: { l: 60, r: 12, t: 8, b: 95 },
+            margin: { l: 60, r: 12, t: 8, b: isMobile() ? 110 : 95 },
             annotations: [
                 {
                     text: 'Historical avg.',
@@ -1168,7 +1148,7 @@
             ],
         };
 
-        Plotly.newPlot('chart-awards-multi', traces, layout, PLOTLY_CONFIG_COMPACT);
+        Plotly.newPlot('chart-awards-multi', traces, layout, plotlyConfigCompact());
     }
 
     // ── Awards: Cumulative Chart (Single Agency) ──
@@ -1295,13 +1275,14 @@
         }
         const yBufferAward = Math.max(yMaxAward * 0.03, 0.01);
 
-        const height = compact ? 340 : 500;
+        const height = compact ? 310 : 500;
         const sourceLabel = SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type;
         const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel)];
 
         const awardYLabel = isPct ? '% of Appropriation Awarded' : isDollars ? 'Cumulative Awards ($M)' : 'Cumulative Award Count';
         const awardsDetailSubtitle = mode === 'counts'
             ? 'Cumulative new award count over the fiscal year.'
+            : isDollars ? 'Cumulative new award dollars over the fiscal year.'
             : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
         const awardsDetailTitle = agencyCfg.display_name + ' \u2014 New Awards'
             + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
@@ -1344,25 +1325,25 @@
                 font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR },
                 bgcolor: 'rgba(0,0,0,0)',
             },
-            hovermode: 'x unified',
+            hovermode: compact ? 'closest' : 'x unified',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#e5e7eb',
+                bordercolor: '#d9d6d0',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
-            plot_bgcolor: 'white',
+            plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
             height: height,
             margin: {
                 l: compact ? 45 : 60,
                 r: 12,
                 t: compact ? 38 : 72,
-                b: compact ? 65 : 110,
+                b: compact ? 65 : (isMobile() ? 125 : 110),
             },
             annotations: awardAnnotations,
         };
 
-        Plotly.newPlot(targetDiv, traces, layout, compact ? PLOTLY_CONFIG_COMPACT : PLOTLY_CONFIG_EXPORT);
+        Plotly.newPlot(targetDiv, traces, layout, compact ? plotlyConfigCompact() : plotlyConfigFull());
     }
 
     // ── Awards: Small Multiples ──
@@ -1492,21 +1473,23 @@
         const select = document.getElementById('awards-agency-select');
         const agencyKey = select.value;
         const agencyAwards = awards[agencyKey];
-        const agencyCfg = DATA.config.agencies[agencyKey];
 
-        // Default to pct; only NIH/NSF have meaningful counts
+        // Only NIH/NSF have meaningful counts
         const hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';
-        const showCounts = hasCounts && document.getElementById('awards-toggle-counts').checked;
-        const mode = showCounts ? 'counts' : 'pct';
+        const mode = getActiveMode('awards-view-mode');
 
-        // Show count toggle only for agencies with count data (NIH, NSF)
-        const toggleContainer = document.getElementById('awards-toggle-container');
-        if (toggleContainer) {
-            toggleContainer.style.display = hasCounts ? '' : 'none';
+        // Disable/enable counts button based on agency
+        const countsBtn = document.querySelector('#awards-view-mode .seg-btn[data-mode="counts"]');
+        if (countsBtn) {
+            countsBtn.disabled = !hasCounts;
+            countsBtn.style.display = hasCounts ? '' : 'none';
         }
 
+        // If counts is selected but not available, fallback to pct
+        const effectiveMode = (mode === 'counts' && !hasCounts) ? 'pct' : mode;
+
         renderAwardsMetrics(agencyKey);
-        renderAwardsCumulativeChart(agencyKey, 'chart-awards-detail', mode, false);
+        renderAwardsCumulativeChart(agencyKey, 'chart-awards-detail', effectiveMode, false);
     }
 
     // ── Awards: Tab Init ──
@@ -1537,11 +1520,19 @@
         }
 
         select.addEventListener('change', () => {
-            // Reset count toggle when switching agencies
-            document.getElementById('awards-toggle-counts').checked = false;
+            // Reset to pct when switching agencies (counts may not be available)
+            const agencyAwards = awards[select.value];
+            const hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';
+            if (!hasCounts && getActiveMode('awards-view-mode') === 'counts') {
+                const pctBtn = document.querySelector('#awards-view-mode .seg-btn[data-mode="pct"]');
+                if (pctBtn) {
+                    document.querySelectorAll('#awards-view-mode .seg-btn').forEach(b => b.classList.remove('active'));
+                    pctBtn.classList.add('active');
+                }
+            }
             renderAwardsDetail();
         });
-        document.getElementById('awards-toggle-counts').addEventListener('change', renderAwardsDetail);
+        initSegmentedControl('awards-view-mode', function() { renderAwardsDetail(); });
 
         renderAwardsMultiChart();
         renderAwardsSmallMultiples();
@@ -1570,8 +1561,7 @@
         renderSmallMultiples();
         renderAgencyDetail();
         renderTables();
-        renderAwardsAnnualTable();
-        renderAwardsSummaryTable();
+        renderAwardsSeriesTable();
         initAwardsTab();
     }
 

@@ -16,7 +16,7 @@
         <header class="site-header">
             <div class="header-inner">
                 <h1 class="site-title">Spending on Science</h1>
-                <p class="site-subtitle">U.S. federal agencies spend tens of billions of dollars on science and R&amp;D each year. This spending follows a relatively predictable schedule, which ensures agencies are able to efficiently allocate resources to the most effective and meritorious research teams. This site follows both total obligation rates and new award activity at five major science agencies to transparently track the pace of spending on science.</p>
+                <p class="site-subtitle">U.S. federal agencies spend tens of billions of dollars on science and R&amp;D each year. This spending follows a relatively predictable schedule. This site tracks both total obligation rates and new award activity at five major science agencies to transparently track the pace of spending on science.</p>
                 <div class="data-badge" id="data-badge"></div>
             </div>
         </header>
@@ -70,17 +70,14 @@
                 <div class="metrics-row" id="agency-metrics"></div>
 
                 <div class="chart-controls">
-                    <label class="toggle-label">
-                        <input type="checkbox" id="toggle-dollars">
-                        <span class="toggle-switch"></span>
-                        <span class="toggle-text">Show dollar amounts</span>
-                    </label>
+                    <div class="segmented-control" id="obligations-view-mode">
+                        <button class="seg-btn active" data-mode="pct">% of Approp</button>
+                        <button class="seg-btn" data-mode="dollars">Dollars</button>
+                    </div>
                 </div>
 
-                <div class="chart-wide">
-                    <div class="chart-card">
-                        <div id="chart-agency-detail" aria-label="Agency obligation spend-down chart"></div>
-                    </div>
+                <div class="chart-card">
+                    <div id="chart-agency-detail" aria-label="Agency obligation spend-down chart"></div>
                 </div>
 
                 <div class="export-toolbar">
@@ -129,18 +126,16 @@
 
                 <div class="metrics-row" id="awards-metrics"></div>
 
-                <div class="chart-controls" id="awards-toggle-container" style="display:none;">
-                    <label class="toggle-label">
-                        <input type="checkbox" id="awards-toggle-counts">
-                        <span class="toggle-switch"></span>
-                        <span class="toggle-text">Show grant counts</span>
-                    </label>
+                <div class="chart-controls">
+                    <div class="segmented-control" id="awards-view-mode">
+                        <button class="seg-btn active" data-mode="pct">% of Approp</button>
+                        <button class="seg-btn" data-mode="dollars">Dollars</button>
+                        <button class="seg-btn" data-mode="counts">Counts</button>
+                    </div>
                 </div>
 
-                <div class="chart-wide">
-                    <div class="chart-card">
-                        <div id="chart-awards-detail" aria-label="Agency award cumulative chart"></div>
-                    </div>
+                <div class="chart-card">
+                    <div id="chart-awards-detail" aria-label="Agency award cumulative chart"></div>
                 </div>
 
                 <div class="export-toolbar">
@@ -183,29 +178,36 @@
                         fiscal year. Quarterly reports (December, March, June, September) are considered official; monthly reports are
                         preliminary. This tracker uses all available periods for the most current picture.</p>
 
+                        <p><strong>Continuing Resolutions.</strong> During a Continuing Resolution, Line 1100 reflects the annualized
+                        prior-year rate. Obligation percentages may appear lower until a full-year bill is enacted, at which point Line
+                        1134 preclusions go to zero and raw and net figures converge.</p>
+
                         <p><strong>Agency filtering.</strong> Each tracked agency corresponds to specific Treasury Account Fund Symbols (TAFS)
-                        or bureau codes within department-level SF-133 files. For example, NIH data is filtered by bureau name within the
-                        HHS file, excluding management and facilities accounts that are not research-related. NSF, DOE Office of Science,
-                        NASA Science, and USDA research accounts are filtered by specific TRACCT codes.</p>
+                        or bureau codes within department-level SF-133 files:</p>
+                        <table>
+                            <tr><th>Agency</th><th>SF-133 Filter</th><th>Scope</th></tr>
+                            <tr><td>NIH</td><td>Bureau: &ldquo;National Institutes of Health,&rdquo; excl. TRACCTs 3966, 4554, 838</td><td>Research institutes &amp; OD (excl. Management Fund, Services &amp; Supply, Buildings)</td></tr>
+                            <tr><td>NSF</td><td>TRACCTs 100, 106, 5176</td><td>Research &amp; Related Activities + STEM Education (incl. H-1B funded). TIP is budgeted within R&amp;RA.</td></tr>
+                            <tr><td>DOE</td><td>TRACCT 222</td><td>Office of Science</td></tr>
+                            <tr><td>NASA</td><td>TRACCT 120</td><td>Science Mission Directorate</td></tr>
+                            <tr><td>USDA</td><td>TRACCTs 1400, 1500, 1502</td><td>Agricultural Research Service + National Institute of Food and Agriculture</td></tr>
+                        </table>
 
                         <p><strong>Historical range.</strong> The shaded band on spend-down charts shows the minimum-to-maximum range across
                         prior fiscal years (FY2016&ndash;FY2024). The dashed line shows the average. These provide context for whether
-                        current-year spending is within normal bounds.</p>
+                        current-year spending is within normal bounds. FY2016 and FY2017 data is available at non-quarterly months only
+                        (8 of 12 periods); the historical range at quarterly reporting periods uses FY2018 onward. FY2020 included
+                        emergency supplemental appropriations (CARES Act) that affected spending levels; this year is included in the
+                        historical baseline.</p>
+
+                        <p><strong>Dollar amounts.</strong> All dollar figures are nominal and not adjusted for inflation.</p>
                     </div>
 
-                    <h2 class="section-heading">Appropriations &amp; Obligations</h2>
+                    <h2 class="section-heading">Obligation Time Series</h2>
+                    <p class="section-subheading">Complete monthly obligation data underlying the spend-down charts. All dollar amounts are nominal.</p>
                     <div class="table-wrapper">
-                        <table id="table-approp" class="data-table">
-                            <caption>Annual appropriation and obligation totals by agency, nominal dollars.</caption>
-                            <thead></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-
-                    <h2 class="section-heading" id="yoy-heading"></h2>
-                    <div class="table-wrapper">
-                        <table id="table-yoy" class="data-table">
-                            <caption>Year-over-year comparison of obligation rates at the latest reporting period.</caption>
+                        <table id="table-obligations-series" class="data-table">
+                            <caption>Cumulative obligations by agency, fiscal year, and reporting period. Sufficient to reproduce all obligation charts.</caption>
                             <thead></thead>
                             <tbody></tbody>
                         </table>
@@ -244,8 +246,13 @@
                         Awards are filtered to Type 1 (new) and Type 2 (competing renewal) grants, excluding subprojects.
                         Date is based on the award notice date. Data is available daily from FY2016 onward.</p>
 
-                        <p><strong>NSF</strong> data comes from the <a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a>.
+                        <p><strong>NSF</strong> data comes from the <a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a>,
+                        covering Research &amp; Related Activities, STEM Education, Technology Innovation &amp; Partnerships, and Integrative Activities
+                        (CFDA programs 47.041, .049, .050, .070, .074, .075, .076, .083, .084).
                         All new awards are included, dated by the award decision date (not the project start date, which may be months later).
+                        Dollar amounts represent the funds obligated in the award&rsquo;s fiscal year, extracted from
+                        the per-year obligation breakdown in the NSF API. For standard grants, this is the full award value;
+                        for continuing grants, it is the first-year increment charged against that year&rsquo;s budget.
                         Data is available daily from FY2016 onward.</p>
 
                         <p><strong>DOE Office of Science, NASA Science, and USDA</strong> data comes from
@@ -255,9 +262,14 @@
                         Data is reported monthly. USASpending coverage begins in FY2017&ndash;2019 depending on the agency;
                         years with incomplete data are automatically excluded from the historical baseline.</p>
 
+                        <p><strong>Comparability.</strong> All three data sources capture initial competitive awards or new award obligations,
+                        excluding non-competing continuations. NIH data includes Type 1 (new) and Type 2 (competing renewal) grants.
+                        NSF captures all new award decisions. USASpending is filtered to new awards only.</p>
+
                         <p><strong>Historical range.</strong> The shaded band on award charts shows the minimum-to-maximum range across
                         available prior fiscal years. The dashed line shows the average. Because USASpending data availability varies by agency,
-                        the baseline period may differ: NIH and NSF use FY2016&ndash;2024, while DOE, NASA, and USDA baselines begin later.</p>
+                        the baseline period may differ: NIH and NSF use FY2016&ndash;2024, while DOE begins FY2019, USDA begins FY2018,
+                        and NASA begins FY2017. Earlier years are excluded due to incomplete data coverage.</p>
 
                         <p><strong>Normalization.</strong> To compare across years and agencies, cumulative new award dollars are expressed
                         as a percentage of the discretionary appropriation (SF-133 Line 1100) for the relevant research component.
@@ -269,19 +281,11 @@
                         to avoid noisy ratios from small denominators.</p>
                     </div>
 
-                    <h2 class="section-heading">Annual New Award Totals</h2>
+                    <h2 class="section-heading">Award Time Series</h2>
+                    <p class="section-subheading">Cumulative new award data underlying the award charts. All dollar amounts are nominal.</p>
                     <div class="table-wrapper">
-                        <table id="table-awards-annual" class="data-table">
-                            <caption>End-of-year cumulative new award counts and dollars by agency and fiscal year.</caption>
-                            <thead></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-
-                    <h2 class="section-heading" id="awards-data-summary-heading">Year-over-Year Comparison</h2>
-                    <div class="table-wrapper">
-                        <table id="table-awards-summary" class="data-table">
-                            <caption>Monthly cumulative new award dollars as a percentage of discretionary appropriation, compared to the prior year and historical average.</caption>
+                        <table id="table-awards-series" class="data-table">
+                            <caption>Cumulative new awards by agency, fiscal year, and date. Sufficient to reproduce all award charts.</caption>
                             <thead></thead>
                             <tbody></tbody>
                         </table>

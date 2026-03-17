@@ -20,7 +20,7 @@ from config import (
     CURRENT_FY,
     NSF_AWARDS_URL,
     NSF_MAX_RESULTS,
-    NSF_RESEARCH_CFDAS,
+    NSF_AWARD_CFDAS,
 )
 
 CACHE_DIR = Path(__file__).parent / "cache" / "nsf"
@@ -109,25 +109,38 @@ def _fetch_month(
 def _extract_records(
     awards: list[dict], fiscal_year: int
 ) -> list[dict]:
-    """Extract and filter to research CFDAs."""
+    """Extract and filter to NSF directorate CFDAs."""
     records = []
     for a in awards:
         cfda = a.get("cfdaNumber", "")
-        if cfda not in NSF_RESEARCH_CFDAS:
+        # Awards may list multiple CFDAs (e.g., "47.076, 47.083").
+        # Include the award if ANY listed CFDA is in the allowed set.
+        award_cfdas = [c.strip() for c in cfda.split(",")]
+        if not any(c in NSF_AWARD_CFDAS for c in award_cfdas):
             continue
 
-        # Parse estimatedTotalAmt (comes as string)
-        try:
-            amt = int(a.get("estimatedTotalAmt", "0").replace(",", ""))
-        except (ValueError, AttributeError):
-            amt = 0
-
-        try:
-            obligated = int(
-                a.get("fundsObligatedAmt", "0").replace(",", "")
-            )
-        except (ValueError, AttributeError):
-            obligated = 0
+        # Use the award-year obligation from the per-year fundsObligated array.
+        # This is the amount actually charged against the award-year's budget,
+        # avoiding two pitfalls:
+        #   - estimatedTotalAmt includes projected future-year costs
+        #   - fundsObligatedAmt is cumulative lifetime obligations (grows retroactively)
+        amt = 0
+        fo_list = a.get("fundsObligated", [])
+        for entry in fo_list:
+            try:
+                parts = entry.split("=")
+                fy_str = parts[0].strip().replace("FY", "").strip()
+                if int(fy_str) == fiscal_year:
+                    amt = int(float(parts[1].strip().replace("$", "").replace(",", "")))
+                    break
+            except (ValueError, IndexError):
+                continue
+        # Fall back to estimatedTotalAmt if no matching FY entry
+        if amt == 0:
+            try:
+                amt = int(a.get("estimatedTotalAmt", "0").replace(",", ""))
+            except (ValueError, AttributeError):
+                amt = 0
 
         # Convert award decision date from MM/DD/YYYY to YYYY-MM-DD
         date_raw = a.get("date", "")
@@ -143,7 +156,6 @@ def _extract_records(
             "agency": "NSF",
             "award_id": a.get("id", ""),
             "award_amount": amt,
-            "funds_obligated": obligated,
             "cfda_number": cfda,
         })
     return records

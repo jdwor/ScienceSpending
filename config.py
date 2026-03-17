@@ -75,10 +75,10 @@ AGENCIES = {
         "color": "#2c5f8a",
     },
     "NSF": {
-        "display_name": "NSF (Research & Related)",
+        "display_name": "NSF",
         "sf133_file_key": "nsf",
         "filter_type": "tracct",
-        "filter_value": "100",
+        "filter_value": ["100", "106", "5176"],
         "color": "#d4883a",
     },
     "DOE_SC": {
@@ -137,9 +137,10 @@ NIH_IC_CODES = [
 NSF_AWARDS_URL = "https://api.nsf.gov/services/v1/awards.json"
 NSF_PAGE_SIZE = 25
 NSF_MAX_RESULTS = 3000
-# Research & Related directorate CFDAs (excludes EDU, TIP, etc.)
-NSF_RESEARCH_CFDAS = [
+# NSF directorate CFDAs (R&RA + STEM Education + TIP + Integrative Activities)
+NSF_AWARD_CFDAS = [
     "47.041", "47.049", "47.050", "47.070", "47.074", "47.075",
+    "47.076", "47.083", "47.084",
 ]
 
 # USASpending API
@@ -157,7 +158,7 @@ AWARDS_CONFIG = {
     },
     "NSF": {
         "source": "nsf_awards",
-        "metric_label": "New Awards",
+        "metric_label": "New Awards (all directorates)",
         "metric_label_short": "Awards",
     },
     "DOE_SC": {
