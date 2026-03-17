@@ -488,7 +488,10 @@
         const detailSubtitle = showPct
             ? 'Cumulative obligations as a percentage of full-year appropriations.'
             : 'Cumulative obligations in billions of dollars by fiscal year month.';
-        const detailTitle = agency.display_name + ' \u2014 Obligation Spend-Down'
+        const mobile = isMobile();
+        const detailTitle = mobile
+            ? agency.display_name + '<br><span style="font-size:10px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>'
+            : agency.display_name + ' \u2014 Obligation Spend-Down'
             + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
         const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")].filter(Boolean);
         annotations.push(...obligationMonthLabels(compact));
@@ -501,7 +504,7 @@
                 xanchor: 'left',
             } : {
                 text: detailTitle,
-                font: { family: FONT_SERIF, size: 16, weight: 600, color: TEXT_COLOR },
+                font: { family: FONT_SERIF, size: mobile ? 14 : 16, weight: 600, color: TEXT_COLOR },
                 x: 0.01,
                 xanchor: 'left',
             },
@@ -1284,7 +1287,10 @@
             ? 'Cumulative new award count over the fiscal year.'
             : isDollars ? 'Cumulative new award dollars over the fiscal year.'
             : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
-        const awardsDetailTitle = agencyCfg.display_name + ' \u2014 New Awards'
+        const mobileAwd = isMobile();
+        const awardsDetailTitle = mobileAwd
+            ? agencyCfg.display_name + '<br><span style="font-size:10px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
+            : agencyCfg.display_name + ' \u2014 New Awards'
             + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
 
         const layout = {
@@ -1295,7 +1301,7 @@
                 xanchor: 'left',
             } : {
                 text: awardsDetailTitle,
-                font: { family: FONT_SERIF, size: 16, weight: 600, color: TEXT_COLOR },
+                font: { family: FONT_SERIF, size: mobileAwd ? 14 : 16, weight: 600, color: TEXT_COLOR },
                 x: 0.01,
                 xanchor: 'left',
             },
