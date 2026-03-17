@@ -350,7 +350,7 @@
             },
             plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
-            height: 460,
+            height: isMobile() ? 340 : 460,
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
@@ -483,7 +483,7 @@
         }
         const yBuffer = Math.max(yMax * 0.03, 0.1);
 
-        const height = compact ? 310 : 500;
+        const height = compact ? 310 : (isMobile() ? 340 : 500);
         const yAxisLabel = showPct ? '% of Appropriation Obligated' : 'Cumulative Obligations ($B)';
         const detailSubtitle = showPct
             ? 'Cumulative obligations as a percentage of full-year appropriations.'
@@ -1130,7 +1130,7 @@
             },
             plot_bgcolor: '#fafaf9',
             paper_bgcolor: 'white',
-            height: 460,
+            height: isMobile() ? 340 : 460,
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
@@ -1275,7 +1275,7 @@
         }
         const yBufferAward = Math.max(yMaxAward * 0.03, 0.01);
 
-        const height = compact ? 310 : 500;
+        const height = compact ? 310 : (isMobile() ? 340 : 500);
         const sourceLabel = SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type;
         const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel)].filter(Boolean);
 
