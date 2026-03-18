@@ -78,7 +78,7 @@ AGENCIES = {
         "display_name": "NSF (R&RA + EDU)",
         "sf133_file_key": "nsf",
         "filter_type": "tracct",
-        "filter_value": ["100", "106", "5176"],
+        "filter_value": ["100", "106"],
         "color": "#d4883a",
     },
     "DOE_SC": {

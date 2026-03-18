@@ -97,9 +97,18 @@ def _fetch_ic(fiscal_year: int, ic: str) -> list[dict]:
 
 
 def _extract_records(results: list[dict], fiscal_year: int) -> list[dict]:
-    """Extract the fields we need from raw API results."""
+    """Extract the fields we need from raw API results.
+
+    Excludes intramural research records (activity codes starting with 'Z'),
+    which are internal laboratory allocations, not extramural grants.
+    """
     records = []
     for r in results:
+        # Skip intramural research (ZIA, ZIC, ZID, etc.)
+        activity = r.get("activity_code", "") or ""
+        if activity.startswith("Z"):
+            continue
+
         admin = r.get("agency_ic_admin") or {}
         records.append({
             "fiscal_year": fiscal_year,
@@ -109,7 +118,7 @@ def _extract_records(results: list[dict], fiscal_year: int) -> list[dict]:
             "award_type": r.get("award_type", ""),
             "project_num": r.get("project_num", ""),
             "award_amount": r.get("award_amount") or 0,
-            "activity_code": r.get("activity_code", ""),
+            "activity_code": activity,
         })
     return records
 

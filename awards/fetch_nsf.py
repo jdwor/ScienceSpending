@@ -30,7 +30,7 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _NSF_PAGE_SIZE = 250
 
 # Only request the fields we actually need for counting and dollar totals
-_PRINT_FIELDS = "id,date,startDate,estimatedTotalAmt,fundsObligatedAmt,cfdaNumber"
+_PRINT_FIELDS = "id,date,startDate,estimatedTotalAmt,fundsObligated,cfdaNumber"
 
 
 def _fy_months(fiscal_year: int) -> list[tuple[int, int]]:

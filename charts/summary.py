@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from config import AGENCIES, CURRENT_FY, FY_MONTH_LABELS
+from config import AGENCIES, BAND_YEARS_EXCLUDE, CURRENT_FY, FY_MONTH_LABELS
 from data.transform import get_latest_period
 
 
@@ -56,9 +56,11 @@ def compute_agency_summary(
     ]
     prior_pct = prior["pct_obligated"].iloc[0] if not prior.empty else None
 
-    # Mean spend-down rate across all prior years at same period
+    # Mean spend-down rate across band-eligible prior years at same period
+    # (must match the envelope computation, which excludes BAND_YEARS_EXCLUDE)
     all_prior = agency_data[
-        (agency_data["fiscal_year"] < current_fy)
+        (~agency_data["fiscal_year"].isin(BAND_YEARS_EXCLUDE))
+        & (agency_data["fiscal_year"] < current_fy)
         & (agency_data["period_month"] == latest_month)
     ]["pct_obligated"]
     mean_pct = all_prior.mean() if not all_prior.empty else None

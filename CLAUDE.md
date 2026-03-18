@@ -38,6 +38,16 @@ Follow `UPDATE.md` for the complete step-by-step update workflow, including:
 - Annual fiscal year rollover procedure
 - Troubleshooting common issues
 
+## Critical: NSF Dollar Extraction
+
+The NSF API offers several dollar fields per award. **Only one is correct for this site:**
+
+- **Use:** The **first entry** of the `fundsObligated` per-year array (e.g., `['FY 2024 = $29,000.00']`). Take entry `[0]` unconditionally — do NOT try to match by fiscal year. FY-matching fails badly: ~7% of awards have funds tagged to a different FY than their decision date, and for awards with multiple FY entries, matching picks up later-year increments instead of the initial obligation. FY-matching produced 32.6% for FY2025 vs the correct 54%.
+- **Do not use:** `estimatedTotalAmt` (includes projected multi-year costs — inflates continuing grants by 2-3x) or `fundsObligatedAmt` (cumulative lifetime obligations — grows retroactively across years).
+- **`_PRINT_FIELDS`** in `fetch_nsf.py` must include `fundsObligated` (the per-year array), not `fundsObligatedAmt` (the scalar).
+- **Validation:** End-of-year NSF pct_of_approp should be 55-60% for all completed FYs. If you see values above 70% or a sudden collapse in the current FY, the wrong dollar field is being used.
+- **Do not refactor** the extraction logic in `_extract_records()`. The current approach was validated against all three alternatives and is the only one that produces stable, defensible numbers.
+
 ## Agencies Tracked
 
 | Key | Name | SF-133 Source | Awards Source |

@@ -20,8 +20,11 @@ def build_obligation_series(df: pd.DataFrame) -> pd.DataFrame:
         agency, fiscal_year, period_month, period_label,
         obligations, appropriations, pct_obligated
     """
-    # Use line 2190 (total obligations) — it has one clean row per TAFS across
-    # all fiscal years, avoiding the CAT_B duplicate issues that plague line 2170.
+    # Use line 2190 (total new obligations and upward adjustments). Combined with
+    # the STAT='U' filter in parse.py, this gives unexpired-account obligations
+    # only — intentionally excluding expired-account adjustments (line 2180).
+    # Line 2190 is preferred over 2170 because it has one clean row per TAFS,
+    # avoiding CAT_B program-activity splits that require aggregation.
     line_oblig = LINE_ITEMS["obligations_total"]           # 2190
     # Use raw appropriation lines (1100/1200) rather than net totals (1160/1260).
     # Line 1160 includes CR preclusions (line 1134) which drastically understate

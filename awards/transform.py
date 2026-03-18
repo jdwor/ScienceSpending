@@ -41,7 +41,10 @@ def _build_daily_cumulative(df: pd.DataFrame, agency_key: str) -> pd.DataFrame:
         fy_group = fy_group.copy()
         fy_group["_date"] = pd.to_datetime(fy_group["date"]).dt.date
         fy_group = fy_group.dropna(subset=["_date"])
-        fy_group = fy_group[fy_group["_date"] >= date(int(fy) - 1, 10, 1)]
+        fy_group = fy_group[
+            (fy_group["_date"] >= date(int(fy) - 1, 10, 1))
+            & (fy_group["_date"] <= date(int(fy), 9, 30))
+        ]
 
         if fy_group.empty:
             continue

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spending on Science</title>
+    <title>Tracking Science Spending</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
         <!-- Header -->
         <header class="site-header">
             <div class="header-inner">
-                <h1 class="site-title">Spending on Science</h1>
+                <h1 class="site-title">Tracking Science Spending</h1>
                 <p class="site-subtitle">U.S. federal agencies spend tens of billions of dollars on science and R&amp;D each year. This spending follows a relatively predictable schedule. This site tracks both total obligation rates and new award activity at five major science agencies to transparently track the pace of spending on science.</p>
                 <div class="data-badge" id="data-badge"></div>
             </div>
@@ -167,8 +167,9 @@
                         published by the Office of Management and Budget. These reports are generated from agency-reported data in the
                         FACTS II system and represent the official record of federal budget execution.
 
-                        <p><strong>Obligations</strong> are measured using Line 2190 (total new obligations &amp; upward adjustments, combining
-                        unexpired and expired accounts). This is the broadest measure of binding spending commitments.</p>
+                        <p><strong>Obligations</strong> are measured using Line 2190 (total new obligations &amp; upward adjustments),
+                        filtered to unexpired accounts only. Expired-account adjustments (Line 2180) are excluded as they represent
+                        prior-year corrections rather than current-year spending activity.</p>
 
                         <p><strong>Appropriations</strong> use Line 1100 (discretionary) + Line 1200 (mandatory)&mdash;the raw enacted
                         appropriation figures rather than net totals (Lines 1160/1260). Net totals include CR preclusions (Line 1134),
@@ -188,7 +189,7 @@
                         <table>
                             <tr><th>Agency</th><th>SF-133 Filter</th><th>Scope</th></tr>
                             <tr><td>NIH</td><td>Bureau: &ldquo;National Institutes of Health,&rdquo; excl. TRACCTs 3966, 4554, 838</td><td>Research institutes &amp; OD (excl. Management Fund, Services &amp; Supply, Buildings)</td></tr>
-                            <tr><td>NSF</td><td>TRACCTs 100, 106, 5176</td><td>Research &amp; Related Activities + STEM Education (incl. H-1B funded). TIP is budgeted within R&amp;RA.</td></tr>
+                            <tr><td>NSF</td><td>TRACCTs 100, 106</td><td>Research &amp; Related Activities + STEM Education. TIP is budgeted within R&amp;RA. H-1B fee-funded accounts (TRACCT 5176) are excluded because they have no corresponding appropriation on Lines 1100/1200.</td></tr>
                             <tr><td>DOE</td><td>TRACCT 222</td><td>Office of Science</td></tr>
                             <tr><td>NASA</td><td>TRACCT 120</td><td>Science Mission Directorate</td></tr>
                             <tr><td>USDA</td><td>TRACCTs 1400, 1500, 1502</td><td>Agricultural Research Service + National Institute of Food and Agriculture</td></tr>
@@ -244,8 +245,9 @@
                         competing-renewal grants, and normalized against discretionary appropriations to allow comparison across years and agencies.
 
                         <p><strong>NIH</strong> data comes from the <a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a>.
-                        Awards are filtered to Type 1 (new) and Type 2 (competing renewal) grants, excluding subprojects.
-                        Date is based on the award notice date. Data is available daily from FY2016 onward.</p>
+                        Awards are filtered to Type 1 (new) and Type 2 (competing renewal) extramural grants, excluding subprojects
+                        and intramural research (activity codes starting with Z). Date is based on the award notice date.
+                        Data is available daily from FY2016 onward.</p>
 
                         <p><strong>NSF</strong> data comes from the <a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a>,
                         covering Research &amp; Related Activities, STEM Education, Technology Innovation &amp; Partnerships, and Integrative Activities
@@ -274,9 +276,12 @@
 
                         <p><strong>Normalization.</strong> To compare across years and agencies, cumulative new award dollars are expressed
                         as a percentage of the discretionary appropriation (SF-133 Line 1100) for the relevant research component.
+                        Mandatory appropriation (Line 1200) is excluded from the awards denominator because competitive grants are
+                        funded from discretionary accounts; mandatory funding supports specific earmarked programs. (The Obligations
+                        tab uses discretionary + mandatory as its denominator because it tracks all spending activity.)
                         This removes variation from budget changes over time, isolating changes in award-making pace.
                         The overview chart divides the current value by the historical average at the same point in the fiscal year
-                        to produce the "% of average pace" metric. Metric cards use the same normalization: year-over-year and
+                        to produce the &ldquo;% of average pace&rdquo; metric. Metric cards use the same normalization: year-over-year and
                         vs-average comparisons are based on appropriation-normalized values, not raw dollar amounts.
                         Agencies whose average appropriation share is below 0.05% at a given point are excluded from the overview chart
                         to avoid noisy ratios from small denominators.</p>

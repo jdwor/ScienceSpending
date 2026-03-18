@@ -773,10 +773,9 @@
         const rows = [];
         for (const [agencyKey, agencyData] of Object.entries(DATA.spenddown)) {
             if (!cfg.agencies[agencyKey]) continue;
-            // Get appropriation from summaries
-            const summary = DATA.summaries[agencyKey];
-            const approp = summary ? summary.appropriations : null;
             for (const [fy, yearData] of Object.entries(agencyData.years)) {
+                // Use per-year appropriation from build data
+                var approp = yearData.appropriation;
                 for (let i = 0; i < yearData.months.length; i++) {
                     if (yearData.months[i] === 1 && yearData.pct[i] === 0) continue; // skip anchor
                     rows.push({
@@ -784,7 +783,7 @@
                         fy: parseInt(fy),
                         month: yearData.months[i],
                         obligations: yearData.dollars_b[i],
-                        appropriations: approp != null ? approp / 1e9 : null,
+                        appropriations: approp,
                         pct: yearData.pct[i],
                     });
                 }

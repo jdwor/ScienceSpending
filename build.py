@@ -145,10 +145,14 @@ def build_spenddown_data(obligation_series):
             # Round pct vals
             pct_vals = [round(v, 3) if v is not None else None for v in pct_vals]
 
+            # Include the appropriation for this FY (same for all months)
+            approp_val = fy_data["appropriations"].iloc[0] if not fy_data.empty else None
+
             year_traces[str(fy)] = {
                 "months": months,
                 "pct": pct_vals,
                 "dollars_b": dollar_vals,
+                "appropriation": round(approp_val / 1e9, 4) if approp_val else None,
             }
 
         agencies_data[agency_key] = {
