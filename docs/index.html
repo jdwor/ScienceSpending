@@ -27,6 +27,7 @@
                 <button class="tab-btn active" data-tab="obligations" role="tab" aria-selected="true" aria-controls="tab-obligations">Obligations</button>
                 <button class="tab-btn" data-tab="awards" role="tab" aria-selected="false" aria-controls="tab-awards">New Awards</button>
                 <button class="tab-btn" data-tab="data" role="tab" aria-selected="false" aria-controls="tab-data">Data &amp; Methods</button>
+                <button class="tab-btn" data-tab="unified" role="tab" aria-selected="false" aria-controls="tab-unified" id="tab-btn-unified" style="display:none;">USASpending Comparison</button>
             </div>
         </nav>
 
@@ -250,9 +251,9 @@
                         covering Research &amp; Related Activities, STEM Education, Technology Innovation &amp; Partnerships, and Integrative Activities
                         (CFDA programs 47.041, .049, .050, .070, .074, .075, .076, .083, .084).
                         All new awards are included, dated by the award decision date (not the project start date, which may be months later).
-                        Dollar amounts represent the funds obligated in the award&rsquo;s fiscal year, extracted from
-                        the per-year obligation breakdown in the NSF API. For standard grants, this is the full award value;
-                        for continuing grants, it is the first-year increment charged against that year&rsquo;s budget.
+                        Dollar amounts represent the initial obligation recorded for each award, extracted from
+                        the per-year funding breakdown in the NSF API. For standard grants, this equals the full award value;
+                        for continuing grants, it is the first-year increment.
                         Data is available daily from FY2016 onward.</p>
 
                         <p><strong>DOE Office of Science, NASA Science, and USDA</strong> data comes from
@@ -312,6 +313,51 @@
                     </div>
                 </div>
             </section>
+            <!-- USASpending Comparison Tab (experimental, hidden unless data present) -->
+            <section id="tab-unified" class="tab-panel" role="tabpanel">
+                <div class="callout">
+                    <strong>Experimental comparison.</strong> This tab shows the same agencies using USASpending.gov as a unified data source for all five, instead of the agency-specific APIs (NIH Reporter, NSF Awards) used on the New Awards tab. This allows comparison of data source effects. USASpending uses the <code>new_awards_only</code> filter, which captures initial obligations on new award records and excludes non-competing continuations. Dollar amounts may differ from the agency APIs due to differences in how transactions are aggregated.
+                </div>
+
+                <div class="chart-header">
+                    <h3 class="chart-title" id="unified-multi-title"></h3>
+                    <p class="chart-subtitle">Each line shows an agency's current award-making pace as a percentage of its historical average, using USASpending data.</p>
+                </div>
+
+                <div class="chart-wide">
+                    <div class="chart-card">
+                        <div id="chart-unified-multi" aria-label="USASpending unified multi-agency chart"></div>
+                    </div>
+                </div>
+
+                <h2 class="section-heading">Individual Agency Trends (USASpending)</h2>
+                <p class="section-subheading">Cumulative new award obligations from USASpending, plotted against the range of prior years.</p>
+                <div class="chart-wide">
+                    <div class="agency-grid" id="unified-small-multiples"></div>
+                </div>
+
+                <div class="section-heading-inline">
+                    <h2 class="section-heading">Agency Detail:</h2>
+                    <div class="select-wrapper select-inline">
+                        <select id="unified-agency-select"></select>
+                    </div>
+                </div>
+                <p class="section-subheading">Summary metrics and cumulative chart using USASpending as the data source.</p>
+
+                <div class="metrics-row" id="unified-metrics"></div>
+
+                <div class="chart-controls">
+                    <div class="segmented-control" id="unified-view-mode">
+                        <button class="seg-btn active" data-mode="pct">% of Approp</button>
+                        <button class="seg-btn" data-mode="dollars">Dollars</button>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div id="chart-unified-detail" aria-label="USASpending unified agency detail chart"></div>
+                </div>
+            </section>
+
         </main>
 
         <!-- Footer -->

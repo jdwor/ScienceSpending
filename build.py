@@ -292,18 +292,18 @@ def _detect_reliable_years(agency_series, fiscal_years, current_fy):
     return [fy for fy in fiscal_years if fy == current_fy or fy_totals.get(fy, 0) >= threshold]
 
 
-def build_awards_site_data():
+def build_awards_site_data(series_override=None, summary_override=None):
     """Build awards chart data from awards/processed/ CSVs if available."""
-    series_path = AWARDS_PROCESSED_DIR / "award_series.csv"
-    summary_path = AWARDS_PROCESSED_DIR / "award_summary.csv"
+    series_path = series_override or (AWARDS_PROCESSED_DIR / "award_series.csv")
+    summary_path = summary_override or (AWARDS_PROCESSED_DIR / "award_summary.csv")
 
-    if not series_path.exists():
+    if not Path(series_path).exists():
         print("No awards data found — skipping awards build.")
         return {}, {}
 
-    print("Loading awards CSVs...")
+    print(f"Loading awards CSVs from {Path(series_path).name}...")
     series = pd.read_csv(series_path)
-    summary_df = pd.read_csv(summary_path) if summary_path.exists() else pd.DataFrame()
+    summary_df = pd.read_csv(summary_path) if Path(summary_path).exists() else pd.DataFrame()
     approp_lookup = _load_approp_lookup()
 
     awards_data = {}
@@ -583,6 +583,31 @@ def main():
         site_data["awards"] = awards_data
     if awards_summary_data:
         site_data["awards_summary"] = awards_summary_data
+
+    # Add unified USASpending comparison data if available (experimental)
+    unified_series_path = AWARDS_PROCESSED_DIR / "award_series_unified.csv"
+    if unified_series_path.exists():
+        print("Loading unified USASpending comparison data...")
+        # Temporarily override AWARDS_CONFIG source types so build treats all as usaspending
+        from config import AWARDS_CONFIG as _acfg
+        _saved = {k: dict(v) for k, v in _acfg.items()}
+        for k in _acfg:
+            _acfg[k] = {**_acfg[k], "source": "usaspending"}
+        try:
+            unified_data, unified_summary = build_awards_site_data(
+                series_override=unified_series_path,
+                summary_override=AWARDS_PROCESSED_DIR / "award_summary_unified.csv",
+            )
+        except TypeError:
+            # Fallback if build_awards_site_data doesn't accept overrides yet
+            unified_data, unified_summary = {}, {}
+        # Restore
+        for k in _saved:
+            _acfg[k] = _saved[k]
+        if unified_data:
+            site_data["awards_unified"] = unified_data
+        if unified_summary:
+            site_data["awards_unified_summary"] = unified_summary
 
     SITE_DATA_DIR.mkdir(parents=True, exist_ok=True)
     out_path = SITE_DATA_DIR / "site_data.json"

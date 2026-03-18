@@ -1546,6 +1546,312 @@
         renderAwardsDetail();
     }
 
+    // ── USASpending Unified Comparison Tab ──
+
+    function initUnifiedTab() {
+        var unified = DATA.awards_unified;
+        var summary = DATA.awards_unified_summary;
+        if (!unified) return;
+
+        // Tab button stays hidden (style="display:none" in HTML)
+        // To re-enable, uncomment: document.getElementById('tab-btn-unified').style.display = '';
+
+        var cfg = DATA.config;
+        var currentFy = cfg.current_fy;
+
+        // Populate agency select
+        var select = document.getElementById('unified-agency-select');
+        for (var key of Object.keys(unified)) {
+            if (!cfg.agencies[key]) continue;
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = cfg.agencies[key].display_name;
+            select.appendChild(opt);
+        }
+
+        function renderDetail() {
+            var agencyKey = select.value;
+            var mode = getActiveMode('unified-view-mode');
+            // Render metrics
+            renderUnifiedMetrics(agencyKey);
+            // Render detail chart — reuse awards cumulative renderer with unified data
+            renderUnifiedCumulativeChart(agencyKey, 'chart-unified-detail', mode, false);
+        }
+
+        select.addEventListener('change', renderDetail);
+        initSegmentedControl('unified-view-mode', renderDetail);
+
+        // Multi-agency chart
+        renderUnifiedMultiChart();
+        // Small multiples
+        renderUnifiedSmallMultiples();
+        // Detail
+        renderDetail();
+    }
+
+    function renderUnifiedMultiChart() {
+        var unified = DATA.awards_unified;
+        var cfg = DATA.config;
+        if (!unified) return;
+
+        var ticks = awardTickArrays();
+        var traces = [];
+        var currentFy = cfg.current_fy;
+
+        traces.push({
+            x: [1, 365], y: [100, 100],
+            mode: 'lines', line: { color: '#9ca3af', width: 1, dash: 'dot' },
+            showlegend: false, hoverinfo: 'skip',
+        });
+
+        for (var agencyKey of Object.keys(unified)) {
+            var agencyData = unified[agencyKey];
+            var agencyCfg = cfg.agencies[agencyKey];
+            if (!agencyCfg) continue;
+            var currentData = agencyData.years[String(currentFy)];
+            if (!currentData) continue;
+            var envelope = agencyData.envelope_pct || agencyData.envelope_dollars;
+            var yCol = agencyData.envelope_pct ? 'pct_of_approp' : 'cumulative_dollars_m';
+            if (!envelope) continue;
+
+            var xVals = [], yVals = [];
+            for (var i = 0; i < currentData.fy_days.length; i++) {
+                var day = currentData.fy_days[i];
+                var currVal = currentData[yCol] ? currentData[yCol][i] : null;
+                if (currVal == null) continue;
+                var closestMean = null;
+                for (var j = envelope.fy_days.length - 1; j >= 0; j--) {
+                    if (envelope.fy_days[j] <= day) { closestMean = envelope.mean[j]; break; }
+                }
+                if (closestMean == null || closestMean < 0.05) continue;
+                xVals.push(day);
+                yVals.push(currVal / closestMean * 100);
+            }
+            if (xVals.length === 0) continue;
+
+            traces.push({
+                x: xVals, y: yVals,
+                mode: 'lines+markers',
+                name: agencyCfg.display_name,
+                line: { color: agencyCfg.color, width: 2.5 },
+                marker: { size: 5, color: agencyCfg.color },
+                text: xVals.map(function(d) { return fyDayToMonth(d); }),
+                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                hoverlabel: { bordercolor: agencyCfg.color },
+            });
+        }
+
+        var titleEl = document.getElementById('unified-multi-title');
+        if (titleEl) titleEl.textContent = 'FY' + currentFy + ' Award Pace (USASpending) vs. Historical Average';
+
+        var layout = {
+            xaxis: Object.assign({}, baseAxisStyle(), {
+                tickvals: ticks.vals, ticktext: ticks.texts, ticks: '',
+                range: [-15, 380], showgrid: true,
+            }),
+            yaxis: Object.assign({}, baseAxisStyle(), {
+                ticksuffix: '%', range: [-6, 200], dtick: 20,
+                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+            }),
+            legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5,
+                      font: { family: FONT_SANS, size: 11, color: MUTED_COLOR } },
+            hovermode: 'closest',
+            hoverlabel: { bgcolor: 'white', bordercolor: '#d9d6d0', font: { family: FONT_SANS, size: 12, color: TEXT_COLOR } },
+            plot_bgcolor: '#fafaf9', paper_bgcolor: 'white',
+            height: isMobile() ? 340 : 460,
+            margin: { l: 60, r: 12, t: 8, b: 95 },
+            annotations: [
+                { text: 'Historical avg.', x: 365, y: 100, xanchor: 'right', yanchor: 'bottom', yshift: 4,
+                  showarrow: false, font: { family: FONT_SANS, size: 10, color: '#9ca3af' } },
+                sourceAnnotation('Source: USASpending.gov', -0.30),
+                ...awardMonthLabels(false),
+            ].filter(Boolean),
+        };
+        Plotly.newPlot('chart-unified-multi', traces, layout, plotlyConfigCompact());
+    }
+
+    function renderUnifiedSmallMultiples() {
+        var unified = DATA.awards_unified;
+        if (!unified) return;
+        var container = document.getElementById('unified-small-multiples');
+        container.innerHTML = '';
+        for (var key of Object.keys(unified)) {
+            if (!DATA.config.agencies[key]) continue;
+            var card = document.createElement('div');
+            card.className = 'chart-card';
+            var chartDiv = document.createElement('div');
+            chartDiv.id = 'chart-unified-mini-' + key;
+            card.appendChild(chartDiv);
+            container.appendChild(card);
+            renderUnifiedCumulativeChart(key, chartDiv.id, 'pct', true);
+        }
+    }
+
+    function renderUnifiedCumulativeChart(agencyKey, targetDiv, mode, compact) {
+        var unified = DATA.awards_unified;
+        var cfg = DATA.config;
+        if (!unified || !unified[agencyKey]) return;
+
+        var agencyAwards = unified[agencyKey];
+        var agencyCfg = cfg.agencies[agencyKey];
+        var traces = [];
+        var currentFy = cfg.current_fy;
+        var isPct = mode === 'pct';
+        var isDollars = mode === 'dollars';
+        var yCol = isPct ? 'pct_of_approp' : 'cumulative_dollars_m';
+        var envelope = isPct ? agencyAwards.envelope_pct : agencyAwards.envelope_dollars;
+
+        if (envelope) {
+            var days = envelope.fy_days.map(fyDayToRefDate);
+            var minV = envelope.min, maxV = envelope.max, medV = envelope.mean;
+            var bandFys = envelope.band_fys;
+            var validIdx = [];
+            for (var i = 0; i < days.length; i++) { if (minV[i] != null) validIdx.push(i); }
+            if (validIdx.length > 0) {
+                var vd = validIdx.map(function(i) { return days[i]; });
+                var vlo = validIdx.map(function(i) { return minV[i]; });
+                var vhi = validIdx.map(function(i) { return maxV[i]; });
+                var vmd = validIdx.map(function(i) { return medV[i]; });
+                var bandLabel = bandFys.length > 1
+                    ? 'FY' + bandFys[0] + '\u2013' + bandFys[bandFys.length - 1] + ' range'
+                    : 'FY' + bandFys[0];
+                traces.push({
+                    x: vd.concat([].concat(vd).reverse()),
+                    y: vhi.concat([].concat(vlo).reverse()),
+                    fill: 'toself', fillcolor: PRIOR_RANGE_COLOR,
+                    line: { width: 0 }, showlegend: true, name: bandLabel, hoverinfo: 'skip',
+                });
+                var medLabel = bandFys.length > 1
+                    ? 'FY' + bandFys[0] + '\u2013' + bandFys[bandFys.length - 1] + ' avg.'
+                    : 'FY' + bandFys[0];
+                traces.push({
+                    x: vd, y: vmd, mode: 'lines',
+                    line: { color: '#b0bac8', width: 1.5, dash: 'dot' },
+                    showlegend: true, name: medLabel,
+                    hovertemplate: isPct ? '<b>Avg.</b>: %{y:.2f}% of approp<extra></extra>'
+                        : '<b>Avg.</b>: $%{y:,.0f}M awarded<extra></extra>',
+                });
+            }
+        }
+
+        var hoverFmt = isPct ? '%{y:.2f}% of approp' : '$%{y:,.0f}M awarded';
+        var highlightYears = cfg.highlight_years || [];
+        for (var hi = 0; hi < highlightYears.length; hi++) {
+            var fy = highlightYears[hi];
+            if (fy === currentFy) continue;
+            var yearData = agencyAwards.years[String(fy)];
+            if (!yearData) continue;
+            traces.push({
+                x: yearData.fy_days.map(fyDayToRefDate), y: yearData[yCol],
+                mode: 'lines', name: 'FY ' + fy,
+                line: { color: HIGHLIGHT_COLORS[fy] || '#94a3b8', width: 1.8 },
+                hovertemplate: '<b>FY ' + fy + '</b>: ' + hoverFmt + '<extra></extra>',
+            });
+        }
+
+        var currentData = agencyAwards.years[String(currentFy)];
+        if (currentData) {
+            traces.push({
+                x: currentData.fy_days.map(fyDayToRefDate), y: currentData[yCol],
+                mode: 'lines+markers', name: 'FY ' + currentFy,
+                line: { color: agencyCfg.color, width: 3 },
+                marker: { size: 6, color: agencyCfg.color },
+                hovertemplate: '<b>FY ' + currentFy + '</b>: ' + hoverFmt + '<extra></extra>',
+            });
+        }
+
+        var yMaxU = 0;
+        for (var ti = 0; ti < traces.length; ti++) {
+            if (!traces[ti].y) continue;
+            for (var vi = 0; vi < traces[ti].y.length; vi++) {
+                if (traces[ti].y[vi] != null && traces[ti].y[vi] > yMaxU) yMaxU = traces[ti].y[vi];
+            }
+        }
+        var yBuf = Math.max(yMaxU * 0.03, 0.01);
+        var height = compact ? 310 : (isMobile() ? 340 : 500);
+        var yAxisLabel = isPct ? '% of Appropriation Awarded' : 'Cumulative Awards ($M)';
+        var annotations = compact ? [] : [sourceAnnotation('Source: USASpending.gov')].filter(Boolean);
+
+        var layout = {
+            title: compact ? {
+                text: agencyCfg.display_name,
+                font: { family: FONT_SANS, size: 12, weight: 600, color: TEXT_COLOR },
+                x: 0.02, xanchor: 'left',
+            } : {
+                text: agencyCfg.display_name + ' \u2014 USASpending',
+                font: { family: FONT_SERIF, size: isMobile() ? 14 : 16, weight: 600, color: TEXT_COLOR },
+                x: 0.01, xanchor: 'left',
+            },
+            xaxis: Object.assign({}, baseAxisStyle(), {
+                type: 'date', dtick: 'M1', tickformat: '%b', ticklabelmode: 'period',
+                hoverformat: '%b', range: ['2000-09-25', '2001-10-05'], showgrid: true,
+                tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
+            }),
+            yaxis: Object.assign({}, baseAxisStyle(), {
+                ticksuffix: isPct ? '%' : 'M', tickprefix: isDollars ? '$' : '',
+                range: [-yBuf, null],
+                tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
+                title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+            }),
+            legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5,
+                      font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR }, bgcolor: 'rgba(0,0,0,0)' },
+            hovermode: compact ? 'closest' : 'x unified',
+            hoverlabel: { bgcolor: 'white', bordercolor: '#d9d6d0', font: { family: FONT_SANS, size: 12, color: TEXT_COLOR } },
+            plot_bgcolor: '#fafaf9', paper_bgcolor: 'white',
+            height: height,
+            margin: { l: compact ? 45 : 60, r: 12, t: compact ? 38 : 72, b: compact ? 65 : 110 },
+            annotations: annotations,
+        };
+        Plotly.newPlot(targetDiv, traces, layout, compact ? plotlyConfigCompact() : plotlyConfigFull());
+    }
+
+    function renderUnifiedMetrics(agencyKey) {
+        var container = document.getElementById('unified-metrics');
+        var summary = DATA.awards_unified_summary;
+        var cfg = DATA.config;
+        if (!summary || !summary[agencyKey]) {
+            container.innerHTML = '<div class="metric-card"><div class="metric-value">No data</div></div>';
+            return;
+        }
+        var summ = summary[agencyKey];
+
+        function card(label, value, delta, deltaDir) {
+            var deltaHtml = '';
+            if (delta) deltaHtml = '<div class="metric-delta ' + (deltaDir || '') + '">' + delta + '</div>';
+            return '<div class="metric-card"><div class="metric-label">' + label + '</div><div class="metric-value">' + value + '</div>' + deltaHtml + '</div>';
+        }
+
+        var html = '';
+        var dollars = summ.cumul_dollars != null ? formatDollars(summ.cumul_dollars) : 'N/A';
+        html += card('Awarded through ' + (summ.latest_date || 'latest'), dollars);
+
+        var pctApprop = summ.cumul_pct_approp != null ? summ.cumul_pct_approp.toFixed(1) + '%' : 'N/A';
+        html += card('% of Appropriation', pctApprop);
+
+        var yoyStr = 'N/A', yoyDir = '';
+        if (summ.cumul_pct_approp != null && summ.prior_year_pct_approp != null) {
+            var diff = summ.cumul_pct_approp - summ.prior_year_pct_approp;
+            var rel = summ.prior_year_pct_approp !== 0 ? (diff / summ.prior_year_pct_approp * 100) : 0;
+            yoyStr = (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'pp (' + (rel >= 0 ? '+' : '') + rel.toFixed(1) + '%)';
+            yoyDir = diff < 0 ? 'negative' : 'positive';
+        }
+        html += card('vs. FY' + (cfg.current_fy - 1), yoyStr, null, yoyDir);
+
+        var medStr = 'N/A', medDir = '';
+        if (summ.cumul_pct_approp != null && summ.mean_pct_approp != null) {
+            var diff2 = summ.cumul_pct_approp - summ.mean_pct_approp;
+            var rel2 = summ.mean_pct_approp !== 0 ? (diff2 / summ.mean_pct_approp * 100) : 0;
+            medStr = (diff2 >= 0 ? '+' : '') + diff2.toFixed(1) + 'pp (' + (rel2 >= 0 ? '+' : '') + rel2.toFixed(1) + '%)';
+            medDir = diff2 < 0 ? 'negative' : 'positive';
+        }
+        html += card('vs. Avg.', medStr, null, medDir);
+
+        container.innerHTML = html;
+        var cards = container.querySelectorAll('.metric-card');
+        if (cards[2] && yoyDir) cards[2].querySelector('.metric-value').classList.add(yoyDir === 'negative' ? 'metric-neg' : 'metric-pos');
+        if (cards[3] && medDir) cards[3].querySelector('.metric-value').classList.add(medDir === 'negative' ? 'metric-neg' : 'metric-pos');
+    }
+
     // ── Initialize ──
 
     async function init() {
@@ -1570,6 +1876,7 @@
         renderTables();
         renderAwardsSeriesTable();
         initAwardsTab();
+        initUnifiedTab();
     }
 
     if (document.readyState === 'loading') {

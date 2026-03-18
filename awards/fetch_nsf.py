@@ -119,23 +119,20 @@ def _extract_records(
         if not any(c in NSF_AWARD_CFDAS for c in award_cfdas):
             continue
 
-        # Use the award-year obligation from the per-year fundsObligated array.
-        # This is the amount actually charged against the award-year's budget,
-        # avoiding two pitfalls:
-        #   - estimatedTotalAmt includes projected future-year costs
-        #   - fundsObligatedAmt is cumulative lifetime obligations (grows retroactively)
+        # Use the first entry in the per-year fundsObligated array.
+        # This is the initial obligation when the award was made.
+        # The FY tag may not match the decision-date fiscal year (e.g., an Oct 2023
+        # award may be tagged "FY 2023" if funded from prior-year budget), so we
+        # take the first entry unconditionally rather than matching by FY.
         amt = 0
         fo_list = a.get("fundsObligated", [])
-        for entry in fo_list:
+        if fo_list:
             try:
-                parts = entry.split("=")
-                fy_str = parts[0].strip().replace("FY", "").strip()
-                if int(fy_str) == fiscal_year:
-                    amt = int(float(parts[1].strip().replace("$", "").replace(",", "")))
-                    break
+                parts = fo_list[0].split("=")
+                amt = int(float(parts[1].strip().replace("$", "").replace(",", "")))
             except (ValueError, IndexError):
-                continue
-        # Fall back to estimatedTotalAmt if no matching FY entry
+                amt = 0
+        # Fall back to estimatedTotalAmt only if fundsObligated is empty
         if amt == 0:
             try:
                 amt = int(a.get("estimatedTotalAmt", "0").replace(",", ""))
