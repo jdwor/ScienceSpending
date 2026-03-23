@@ -147,6 +147,9 @@ NSF_AWARD_CFDAS = [
 USASPENDING_TIME_URL = (
     "https://api.usaspending.gov/api/v2/search/spending_over_time/"
 )
+USASPENDING_AWARD_SEARCH_URL = (
+    "https://api.usaspending.gov/api/v2/search/spending_by_award/"
+)
 USASPENDING_AWARD_TYPE_CODES = ["04", "05"]  # Project grants + Cooperative agreements
 
 # Per-agency awards configuration

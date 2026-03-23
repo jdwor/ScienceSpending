@@ -17,6 +17,7 @@ import requests
 from config import (
     AWARDS_CONFIG,
     CURRENT_FY,
+    USASPENDING_AWARD_SEARCH_URL,
     USASPENDING_AWARD_TYPE_CODES,
     USASPENDING_TIME_URL,
 )
@@ -116,6 +117,75 @@ def fetch_usaspending_awards(
     return df
 
 
+def fetch_usaspending_freshness(
+    agency_key: str, fiscal_year: int, force: bool = False,
+) -> str | None:
+    """
+    Query the per-award endpoint to find the max last_modified_date for
+    an agency's current-FY awards.  Returns an ISO date string (e.g.
+    '2026-03-20') or None on failure / no data.
+
+    Only meaningful for the current FY — for completed FYs, returns None.
+    """
+    if fiscal_year != CURRENT_FY:
+        return None
+
+    cache_file = CACHE_DIR / f"{agency_key}_fy{fiscal_year}_freshness.json"
+
+    if not force and _cache_is_fresh(cache_file, fiscal_year):
+        with open(cache_file) as f:
+            cached = json.load(f)
+        return cached.get("max_last_modified_date")
+
+    cfg = AWARDS_CONFIG[agency_key]
+    start, end = _fy_date_range(fiscal_year)
+
+    payload = {
+        "filters": {
+            "agencies": [
+                {
+                    "type": "funding",
+                    "tier": cfg["agency_tier"],
+                    "name": cfg["agency_name"],
+                }
+            ],
+            "award_type_codes": USASPENDING_AWARD_TYPE_CODES,
+            "time_period": [
+                {"start_date": start, "end_date": end, "date_type": "new_awards_only"}
+            ],
+            "program_numbers": cfg["cfda"],
+        },
+        "fields": ["Award ID", "Last Modified Date"],
+        "limit": 1,
+        "page": 1,
+        "sort": "Last Modified Date",
+        "order": "desc",
+    }
+
+    try:
+        print(f"  Fetching USASpending freshness {agency_key} FY{fiscal_year}...")
+        resp = requests.post(USASPENDING_AWARD_SEARCH_URL, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        print(f"  WARNING: freshness fetch failed for {agency_key}: {exc}")
+        return None
+
+    results = data.get("results", [])
+    if not results:
+        return None
+
+    # last_modified_date looks like '2026-03-20T15:40:52.263484'
+    raw_date = results[0].get("Last Modified Date", "")
+    max_date = raw_date[:10] if raw_date else None
+
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(cache_file, "w") as f:
+        json.dump({"max_last_modified_date": max_date}, f)
+
+    return max_date
+
+
 def fetch_usaspending_all(
     agency_keys: list[str] | None = None,
     fiscal_years: list[int] | None = None,
@@ -141,3 +211,21 @@ def fetch_usaspending_all(
         if frames:
             results[key] = pd.concat(frames, ignore_index=True)
     return results
+
+
+def fetch_all_freshness(
+    agency_keys: list[str] | None = None,
+    force: bool = False,
+) -> dict[str, str]:
+    """Fetch freshness (max last_modified_date) for all USASpending agencies."""
+    if agency_keys is None:
+        agency_keys = [
+            k for k, v in AWARDS_CONFIG.items() if v["source"] == "usaspending"
+        ]
+
+    freshness = {}
+    for key in agency_keys:
+        result = fetch_usaspending_freshness(key, CURRENT_FY, force=force)
+        if result:
+            freshness[key] = result
+    return freshness

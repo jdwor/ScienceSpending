@@ -215,20 +215,38 @@
         const btns = document.querySelectorAll('.tab-btn');
         const panels = document.querySelectorAll('.tab-panel');
 
+        function activateTab(tabName) {
+            const btn = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+            if (!btn) return;
+            btns.forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
+            panels.forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+            document.getElementById('tab-' + tabName).classList.add('active');
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+        }
+
+        // Map between URL hashes and internal tab names
+        const tabToHash = { obligations: 'obligations', awards: 'awards', data: 'methods', unified: 'unified' };
+        const hashToTab = {};
+        for (const k in tabToHash) hashToTab[tabToHash[k]] = k;
+
         btns.forEach(btn => {
             btn.addEventListener('click', () => {
-                btns.forEach(b => {
-                    b.classList.remove('active');
-                    b.setAttribute('aria-selected', 'false');
-                });
-                panels.forEach(p => p.classList.remove('active'));
-                btn.classList.add('active');
-                btn.setAttribute('aria-selected', 'true');
-                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-
-                setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                activateTab(btn.dataset.tab);
+                history.replaceState(null, '', '#' + (tabToHash[btn.dataset.tab] || btn.dataset.tab));
             });
         });
+
+        // Activate tab from URL hash on load
+        const hash = location.hash.replace('#', '');
+        const tabFromHash = hashToTab[hash] || hash;
+        if (tabFromHash && document.querySelector('.tab-btn[data-tab="' + tabFromHash + '"]')) {
+            activateTab(tabFromHash);
+        }
     }
 
     // ── Data & Methods Section Toggle ──
@@ -332,7 +350,7 @@
                 ticksuffix: '%',
                 range: [-6, 200],
                 dtick: 20,
-                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -361,7 +379,7 @@
                     yanchor: 'bottom',
                     yshift: 4,
                     showarrow: false,
-                    font: { family: FONT_SANS, size: 10, color: '#9ca3af' },
+                    font: { family: FONT_SANS, size: 11, color: '#9ca3af' },
                 },
                 sourceAnnotation("Source: OMB SF-133", -0.30),
                 ...obligationMonthLabels(false),
@@ -490,7 +508,7 @@
             : 'Cumulative obligations in billions of dollars by fiscal year month.';
         const mobile = isMobile();
         const detailTitle = mobile
-            ? agency.display_name + '<br><span style="font-size:10px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>'
+            ? agency.display_name + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>'
             : agency.display_name + ' \u2014 Obligation Spend-Down'
             + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
         const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")].filter(Boolean);
@@ -522,7 +540,7 @@
                 tick0: 0,
                 range: [-yBuffer, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
-                title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -530,7 +548,7 @@
                 y: -0.18,
                 xanchor: 'center',
                 x: 0.5,
-                font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR },
+                font: { family: FONT_SANS, size: compact ? 9 : 11, color: MUTED_COLOR },
                 bgcolor: 'rgba(0,0,0,0)',
             },
             hovermode: compact ? 'closest' : 'x unified',
@@ -1006,12 +1024,21 @@
                 const currVal = currentData[yCol] ? currentData[yCol][i] : null;
                 if (currVal == null) continue;
 
-                // Find closest envelope day <= this day
+                // Interpolate envelope mean at this day
                 let closestMean = null;
-                for (let j = envelope.fy_days.length - 1; j >= 0; j--) {
-                    if (envelope.fy_days[j] <= day) {
-                        closestMean = envelope.mean[j];
-                        break;
+                const eDays = envelope.fy_days;
+                const eMean = envelope.mean;
+                if (day <= eDays[0]) {
+                    closestMean = eMean[0];
+                } else if (day >= eDays[eDays.length - 1]) {
+                    closestMean = eMean[eMean.length - 1];
+                } else {
+                    for (let j = 0; j < eDays.length - 1; j++) {
+                        if (eDays[j] <= day && day <= eDays[j + 1]) {
+                            const frac = (day - eDays[j]) / (eDays[j + 1] - eDays[j]);
+                            closestMean = eMean[j] + frac * (eMean[j + 1] - eMean[j]);
+                            break;
+                        }
                     }
                 }
 
@@ -1069,6 +1096,15 @@
                 }
             }
 
+            // For monthly USASpending with a provisional last point, split off the tail
+            const provIdx = currentData.provisional_index;
+            if (!isDaily && provIdx != null && plotX.length > 1) {
+                tailX = [plotX[plotX.length - 2], plotX[plotX.length - 1]];
+                tailY = [plotY[plotY.length - 2], plotY[plotY.length - 1]];
+                plotX = plotX.slice(0, -1);
+                plotY = plotY.slice(0, -1);
+            }
+
             traces.push({
                 x: plotX,
                 y: plotY,
@@ -1114,7 +1150,7 @@
                 ticksuffix: '%',
                 range: [-6, 200],
                 dtick: 20,
-                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -1143,7 +1179,7 @@
                     yanchor: 'bottom',
                     yshift: 4,
                     showarrow: false,
-                    font: { family: FONT_SANS, size: 10, color: '#9ca3af' },
+                    font: { family: FONT_SANS, size: 11, color: '#9ca3af' },
                 },
                 sourceAnnotation('Source: NIH Reporter, NSF Awards, USASpending', -0.30),
                 ...awardMonthLabels(false),
@@ -1257,15 +1293,42 @@
         // Current FY
         const currentData = agencyAwards.years[String(currentFy)];
         if (currentData) {
-            traces.push({
-                x: currentData.fy_days.map(fyDayToRefDate),
-                y: currentData[yCol],
-                mode: isDaily ? 'lines' : 'lines+markers',
-                name: `FY ${currentFy}`,
-                line: { color: agencyCfg.color, width: 3 },
-                marker: { size: isDaily ? 0 : 6, color: agencyCfg.color },
-                hovertemplate: `<b>FY ${currentFy}</b>: ${hoverFmt}<extra></extra>`,
-            });
+            const provIdx = currentData.provisional_index;
+            const allX = currentData.fy_days.map(fyDayToRefDate);
+            const allY = currentData[yCol];
+
+            if (provIdx != null && provIdx > 0) {
+                // Split into complete portion (with markers) and provisional tail (line only)
+                traces.push({
+                    x: allX.slice(0, provIdx),
+                    y: allY.slice(0, provIdx),
+                    mode: isDaily ? 'lines' : 'lines+markers',
+                    name: `FY ${currentFy}`,
+                    line: { color: agencyCfg.color, width: 3 },
+                    marker: { size: isDaily ? 0 : 6, color: agencyCfg.color },
+                    hovertemplate: `<b>FY ${currentFy}</b>: ${hoverFmt}<extra></extra>`,
+                });
+                // Provisional tail — connects last complete point to provisional point
+                traces.push({
+                    x: allX.slice(provIdx - 1, provIdx + 1),
+                    y: allY.slice(provIdx - 1, provIdx + 1),
+                    mode: 'lines',
+                    name: `FY ${currentFy}`,
+                    line: { color: agencyCfg.color, width: 3 },
+                    hovertemplate: `<b>FY ${currentFy}</b>: ${hoverFmt}<extra></extra>`,
+                    showlegend: false,
+                });
+            } else {
+                traces.push({
+                    x: allX,
+                    y: allY,
+                    mode: isDaily ? 'lines' : 'lines+markers',
+                    name: `FY ${currentFy}`,
+                    line: { color: agencyCfg.color, width: 3 },
+                    marker: { size: isDaily ? 0 : 6, color: agencyCfg.color },
+                    hovertemplate: `<b>FY ${currentFy}</b>: ${hoverFmt}<extra></extra>`,
+                });
+            }
         }
 
         // Compute y-axis buffer as 3% of the data max so it's consistent across agencies
@@ -1289,7 +1352,7 @@
             : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
         const mobileAwd = isMobile();
         const awardsDetailTitle = mobileAwd
-            ? agencyCfg.display_name + '<br><span style="font-size:10px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
+            ? agencyCfg.display_name + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
             : agencyCfg.display_name + ' \u2014 New Awards'
             + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
 
@@ -1320,7 +1383,7 @@
                 tickprefix: isDollars ? '$' : '',
                 range: [-yBufferAward, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
-                title: compact ? undefined : { text: awardYLabel, font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: compact ? undefined : { text: awardYLabel, font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -1328,7 +1391,7 @@
                 y: -0.18,
                 xanchor: 'center',
                 x: 0.5,
-                font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR },
+                font: { family: FONT_SANS, size: compact ? 9 : 11, color: MUTED_COLOR },
                 bgcolor: 'rgba(0,0,0,0)',
             },
             hovermode: compact ? 'closest' : 'x unified',
@@ -1613,14 +1676,27 @@
             var yCol = agencyData.envelope_pct ? 'pct_of_approp' : 'cumulative_dollars_m';
             if (!envelope) continue;
 
+            var eDays = envelope.fy_days;
+            var eMean = envelope.mean;
             var xVals = [], yVals = [];
             for (var i = 0; i < currentData.fy_days.length; i++) {
                 var day = currentData.fy_days[i];
                 var currVal = currentData[yCol] ? currentData[yCol][i] : null;
                 if (currVal == null) continue;
+                // Interpolate envelope mean at this day
                 var closestMean = null;
-                for (var j = envelope.fy_days.length - 1; j >= 0; j--) {
-                    if (envelope.fy_days[j] <= day) { closestMean = envelope.mean[j]; break; }
+                if (day <= eDays[0]) {
+                    closestMean = eMean[0];
+                } else if (day >= eDays[eDays.length - 1]) {
+                    closestMean = eMean[eMean.length - 1];
+                } else {
+                    for (var j = 0; j < eDays.length - 1; j++) {
+                        if (eDays[j] <= day && day <= eDays[j + 1]) {
+                            var frac = (day - eDays[j]) / (eDays[j + 1] - eDays[j]);
+                            closestMean = eMean[j] + frac * (eMean[j + 1] - eMean[j]);
+                            break;
+                        }
+                    }
                 }
                 if (closestMean == null || closestMean < 0.05) continue;
                 xVals.push(day);
@@ -1628,16 +1704,39 @@
             }
             if (xVals.length === 0) continue;
 
+            // Split provisional tail for USASpending agencies
+            var provIdx = currentData.provisional_index;
+            var plotX = xVals, plotY = yVals;
+            var tailX = null, tailY = null;
+            if (provIdx != null && plotX.length > 1) {
+                tailX = [plotX[plotX.length - 2], plotX[plotX.length - 1]];
+                tailY = [plotY[plotY.length - 2], plotY[plotY.length - 1]];
+                plotX = plotX.slice(0, -1);
+                plotY = plotY.slice(0, -1);
+            }
+
             traces.push({
-                x: xVals, y: yVals,
+                x: plotX, y: plotY,
                 mode: 'lines+markers',
                 name: agencyCfg.display_name,
                 line: { color: agencyCfg.color, width: 2.5 },
                 marker: { size: 5, color: agencyCfg.color },
-                text: xVals.map(function(d) { return fyDayToMonth(d); }),
+                text: plotX.map(function(d) { return fyDayToMonth(d); }),
                 hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agencyCfg.color },
             });
+            if (tailX) {
+                traces.push({
+                    x: tailX, y: tailY,
+                    mode: 'lines',
+                    name: agencyCfg.display_name,
+                    line: { color: agencyCfg.color, width: 2.5 },
+                    text: tailX.map(function(d) { return fyDayToMonth(d); }),
+                    hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                    hoverlabel: { bordercolor: agencyCfg.color },
+                    showlegend: false,
+                });
+            }
         }
 
         var titleEl = document.getElementById('unified-multi-title');
@@ -1650,7 +1749,7 @@
             }),
             yaxis: Object.assign({}, baseAxisStyle(), {
                 ticksuffix: '%', range: [-6, 200], dtick: 20,
-                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5,
                       font: { family: FONT_SANS, size: 11, color: MUTED_COLOR } },
@@ -1661,7 +1760,7 @@
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 { text: 'Historical avg.', x: 365, y: 100, xanchor: 'right', yanchor: 'bottom', yshift: 4,
-                  showarrow: false, font: { family: FONT_SANS, size: 10, color: '#9ca3af' } },
+                  showarrow: false, font: { family: FONT_SANS, size: 11, color: '#9ca3af' } },
                 sourceAnnotation('Source: USASpending.gov', -0.30),
                 ...awardMonthLabels(false),
             ].filter(Boolean),
@@ -1750,13 +1849,35 @@
 
         var currentData = agencyAwards.years[String(currentFy)];
         if (currentData) {
-            traces.push({
-                x: currentData.fy_days.map(fyDayToRefDate), y: currentData[yCol],
-                mode: 'lines+markers', name: 'FY ' + currentFy,
-                line: { color: agencyCfg.color, width: 3 },
-                marker: { size: 6, color: agencyCfg.color },
-                hovertemplate: '<b>FY ' + currentFy + '</b>: ' + hoverFmt + '<extra></extra>',
-            });
+            var uProvIdx = currentData.provisional_index;
+            var uAllX = currentData.fy_days.map(fyDayToRefDate);
+            var uAllY = currentData[yCol];
+
+            if (uProvIdx != null && uProvIdx > 0) {
+                traces.push({
+                    x: uAllX.slice(0, uProvIdx), y: uAllY.slice(0, uProvIdx),
+                    mode: 'lines+markers', name: 'FY ' + currentFy,
+                    line: { color: agencyCfg.color, width: 3 },
+                    marker: { size: 6, color: agencyCfg.color },
+                    hovertemplate: '<b>FY ' + currentFy + '</b>: ' + hoverFmt + '<extra></extra>',
+                });
+                traces.push({
+                    x: uAllX.slice(uProvIdx - 1, uProvIdx + 1),
+                    y: uAllY.slice(uProvIdx - 1, uProvIdx + 1),
+                    mode: 'lines', name: 'FY ' + currentFy,
+                    line: { color: agencyCfg.color, width: 3 },
+                    hovertemplate: '<b>FY ' + currentFy + '</b>: ' + hoverFmt + '<extra></extra>',
+                    showlegend: false,
+                });
+            } else {
+                traces.push({
+                    x: uAllX, y: uAllY,
+                    mode: 'lines+markers', name: 'FY ' + currentFy,
+                    line: { color: agencyCfg.color, width: 3 },
+                    marker: { size: 6, color: agencyCfg.color },
+                    hovertemplate: '<b>FY ' + currentFy + '</b>: ' + hoverFmt + '<extra></extra>',
+                });
+            }
         }
 
         var yMaxU = 0;
@@ -1790,10 +1911,10 @@
                 ticksuffix: isPct ? '%' : 'M', tickprefix: isDollars ? '$' : '',
                 range: [-yBuf, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
-                title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 10, color: MUTED_COLOR }, standoff: 5 },
+                title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5,
-                      font: { family: FONT_SANS, size: compact ? 9 : 10, color: MUTED_COLOR }, bgcolor: 'rgba(0,0,0,0)' },
+                      font: { family: FONT_SANS, size: compact ? 9 : 11, color: MUTED_COLOR }, bgcolor: 'rgba(0,0,0,0)' },
             hovermode: compact ? 'closest' : 'x unified',
             hoverlabel: { bgcolor: 'white', bordercolor: '#d9d6d0', font: { family: FONT_SANS, size: 12, color: TEXT_COLOR } },
             plot_bgcolor: '#fafaf9', paper_bgcolor: 'white',

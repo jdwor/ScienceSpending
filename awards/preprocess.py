@@ -10,6 +10,7 @@ import argparse
 from pathlib import Path
 
 from awards.fetch import fetch_all_awards
+from awards.fetch_usaspending import fetch_all_freshness
 from awards.transform import build_award_series, build_award_summary
 
 PROCESSED_DIR = Path(__file__).parent / "processed"
@@ -33,9 +34,16 @@ def main(
         print(f"  {key}: {len(df)} raw records")
     print()
 
+    # Fetch freshness data for USASpending agencies
+    print("Fetching USASpending freshness data...")
+    freshness = fetch_all_freshness(force=force)
+    for key, dt in freshness.items():
+        print(f"  {key}: max last_modified_date = {dt}")
+    print()
+
     # Transform
     print("Building cumulative series...")
-    series = build_award_series(raw)
+    series = build_award_series(raw, freshness_data=freshness)
     print(f"  {len(series)} series rows")
 
     summary = build_award_summary(series)

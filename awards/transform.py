@@ -67,19 +67,54 @@ def _build_daily_cumulative(df: pd.DataFrame, agency_key: str) -> pd.DataFrame:
                 "cumulative_count": int(row["cumulative_count"]),
                 "cumulative_dollars": float(row["cumulative_dollars"]),
                 "source_type": source,
+                "is_provisional": False,
             })
 
     return pd.DataFrame(records)
 
 
+def _fy_month_to_next_boundary(fy_month: int, fiscal_year: int) -> date:
+    """Convert a fiscal-year month to the first day of the NEXT calendar month.
+
+    This places "cumulative through end of October" at the Nov 1 boundary,
+    matching how obligations data sits on month boundaries.
+    """
+    next_month = (fy_month % 12) + 1  # next fiscal month (1-12)
+    cal_month = (next_month + 8) % 12 + 1
+    cal_year = fiscal_year - 1 if cal_month >= 10 else fiscal_year
+    # For fy_month 12 (Sep), next month is Oct of the following FY
+    if fy_month == 12:
+        cal_year = fiscal_year
+    return date(cal_year, cal_month, 1)
+
+
 def _build_monthly_cumulative(
-    df: pd.DataFrame, agency_key: str
+    df: pd.DataFrame, agency_key: str,
+    freshness_date: str | None = None,
 ) -> pd.DataFrame:
-    """Build monthly cumulative series for USASpending data."""
+    """Build monthly cumulative series for USASpending data.
+
+    If *freshness_date* is provided (ISO date string, e.g. '2026-03-20'),
+    it represents the max last_modified_date from the per-award API.
+    A fiscal month M is considered complete if *freshness_date* falls in
+    calendar month M+1 or later.  The latest incomplete month is placed
+    at *freshness_date* rather than the next-month boundary.  If freshness
+    data is unavailable (None), the latest active month is dropped entirely
+    for the current FY to avoid showing potentially incomplete data.
+    """
     source = AWARDS_CONFIG[agency_key]["source"]
     records = []
 
+    # Parse freshness date once
+    fresh_date = None
+    if freshness_date:
+        try:
+            fresh_date = date.fromisoformat(freshness_date)
+        except ValueError:
+            fresh_date = None
+
     for fy, fy_group in df.groupby("fiscal_year"):
+        fy_int = int(fy)
         fy_group = fy_group.sort_values("fy_month")
 
         # Find last month with non-zero obligation to trim trailing zeros
@@ -87,31 +122,62 @@ def _build_monthly_cumulative(
         last_active_month = int(nonzero["fy_month"].max()) if not nonzero.empty else 0
         fy_group = fy_group[fy_group["fy_month"] <= last_active_month]
 
+        if fy_group.empty:
+            continue
+
+        # Determine which months are complete for current FY
+        is_current_fy = (fy_int == CURRENT_FY)
+        last_complete_fy_month = None  # None means "all complete" (past FYs)
+
+        if is_current_fy:
+            if fresh_date is None:
+                # No freshness data — be conservative: drop the last active month
+                last_complete_fy_month = last_active_month - 1
+            else:
+                # A month M is complete if fresh_date is in calendar month M+1.
+                # fresh_date's calendar month → the FY month that is "completed"
+                fresh_cal_month = fresh_date.month
+                # The completed month is the one *before* the month containing fresh_date.
+                # Convert fresh_date's calendar month to FY month:
+                fresh_fy_month = (fresh_cal_month - 10) % 12 + 1
+                # All FY months before fresh_fy_month are complete
+                last_complete_fy_month = fresh_fy_month - 1
+
         cumulative = 0.0
 
         for _, row in fy_group.iterrows():
             fy_month = int(row["fy_month"])
             cumulative += float(row["obligation_amount"])
 
-            # Convert fy_month to first day of the NEXT month.  This places
-            # "cumulative through end of October" at the Nov 1 boundary, matching
-            # how obligations data sits on month boundaries.
-            next_month = (fy_month % 12) + 1  # next fiscal month (1-12)
-            cal_month = (next_month + 8) % 12 + 1
-            cal_year = int(fy) - 1 if cal_month >= 10 else int(fy)
-            # For fy_month 12 (Sep), next month is Oct of the following FY
-            if fy_month == 12:
-                cal_year = int(fy)
-            d = date(cal_year, cal_month, 1)
+            if is_current_fy and last_complete_fy_month is not None:
+                if fy_month > last_complete_fy_month + 1:
+                    # Beyond the provisional month — don't include
+                    break
+                elif fy_month == last_complete_fy_month + 1:
+                    # This is the provisional month — place at freshness date
+                    if fresh_date is None:
+                        # No freshness data — skip this month entirely
+                        break
+                    d = fresh_date
+                    is_provisional = True
+                else:
+                    # Complete month — place at next-month boundary
+                    d = _fy_month_to_next_boundary(fy_month, fy_int)
+                    is_provisional = False
+            else:
+                # Past FY or all months complete
+                d = _fy_month_to_next_boundary(fy_month, fy_int)
+                is_provisional = False
 
             records.append({
                 "agency": agency_key,
-                "fiscal_year": int(fy),
+                "fiscal_year": fy_int,
                 "date": d.isoformat(),
-                "fy_day": _fy_day(d, int(fy)),
+                "fy_day": _fy_day(d, fy_int),
                 "cumulative_count": 0,  # Not meaningful for USASpending
                 "cumulative_dollars": cumulative,
                 "source_type": source,
+                "is_provisional": is_provisional,
             })
 
     return pd.DataFrame(records)
@@ -119,14 +185,20 @@ def _build_monthly_cumulative(
 
 def build_award_series(
     raw_data: dict[str, pd.DataFrame],
+    freshness_data: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Build cumulative award time series for all agencies.
 
+    *freshness_data* maps USASpending agency keys to their max
+    last_modified_date (ISO string), used to determine which months
+    are complete vs provisional.
+
     Returns DataFrame with columns:
         agency, fiscal_year, date, fy_day, cumulative_count,
-        cumulative_dollars, source_type
+        cumulative_dollars, source_type, is_provisional
     """
+    freshness_data = freshness_data or {}
     frames = []
 
     for agency_key, df in raw_data.items():
@@ -136,7 +208,10 @@ def build_award_series(
         if source in ("nih_reporter", "nsf_awards"):
             frames.append(_build_daily_cumulative(df, agency_key))
         elif source == "usaspending":
-            frames.append(_build_monthly_cumulative(df, agency_key))
+            frames.append(_build_monthly_cumulative(
+                df, agency_key,
+                freshness_date=freshness_data.get(agency_key),
+            ))
 
     if not frames:
         return pd.DataFrame()

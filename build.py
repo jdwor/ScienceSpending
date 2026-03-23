@@ -344,7 +344,8 @@ def build_awards_site_data(series_override=None, summary_override=None):
             dollars_list = fy_data["cumulative_dollars"].tolist()
 
             # Prepend Oct 1 anchor if series doesn't start there
-            if fy_days[0] != 1:
+            prepended_anchor = fy_days[0] != 1
+            if prepended_anchor:
                 fy_start_date = f"{fy - 1}-10-01"
                 fy_days = [1] + fy_days
                 dates = [fy_start_date] + dates
@@ -360,13 +361,27 @@ def build_awards_site_data(series_override=None, summary_override=None):
             else:
                 pct_approp = [None] * len(dollars_list)
 
-            year_traces[str(fy)] = {
+            # Determine provisional_index if the is_provisional column exists
+            provisional_index = None
+            if "is_provisional" in fy_data.columns:
+                prov_rows = fy_data[fy_data["is_provisional"] == True]
+                if not prov_rows.empty:
+                    # provisional_index is the index in the *output* arrays
+                    # (after prepending Oct 1 anchor)
+                    offset = 1 if prepended_anchor else 0
+                    prov_pos = fy_data.index.get_loc(prov_rows.index[0])
+                    provisional_index = prov_pos + offset
+
+            trace = {
                 "fy_days": fy_days,
                 "dates": dates,
                 "cumulative_count": counts,
                 "cumulative_dollars_m": dollars_m,
                 "pct_of_approp": pct_approp,
             }
+            if provisional_index is not None:
+                trace["provisional_index"] = provisional_index
+            year_traces[str(fy)] = trace
 
         # Anchor all series at fy_day=1 with value 0 before envelope computation
         anchored_frames = []
