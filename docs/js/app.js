@@ -209,8 +209,8 @@
             badge.style.display = 'none';
         }
 
-        if (buildEl && cfg.build_date) {
-            buildEl.innerHTML = 'Site built ' + cfg.build_date + ' by Jordan Dworkin\u2002<a href="mailto:jordan.dworkin@coefficientgiving.org" title="Contact" style="text-decoration:none;">&#9993;</a>';
+        if (buildEl) {
+            buildEl.innerHTML = 'Built by Jordan Dworkin\u2002<a href="mailto:jordan.dworkin@coefficientgiving.org" title="Contact" style="text-decoration:none;">&#9993;</a>';
         }
     }
 
