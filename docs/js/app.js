@@ -180,7 +180,7 @@
         const parts = [];
 
         if (cfg.latest_period_label) {
-            parts.push('Obligations through ' + cfg.latest_period_label + ' FY' + cfg.current_fy);
+            parts.push('Obligations through ' + cfg.latest_period_label + ' ' + cfg.current_fy);
         }
 
         // Find latest awards date across all agencies
@@ -194,7 +194,7 @@
                 const dt = new Date(latestAwardDate + 'T00:00:00');
                 const monthName = dt.toLocaleString('en-US', { month: 'short' });
                 const fyMonth = dt.getMonth() >= 9 ? dt.getMonth() - 8 : dt.getMonth() + 4;
-                parts.push('Awards through ' + monthName + ' FY' + cfg.current_fy);
+                parts.push('Awards through ' + monthName + ' ' + cfg.current_fy);
             }
         }
 
@@ -210,7 +210,7 @@
         }
 
         if (buildEl && cfg.build_date) {
-            buildEl.textContent = 'Site built ' + cfg.build_date;
+            buildEl.innerHTML = 'Site built ' + cfg.build_date + ' by Jordan Dworkin\u2002<a href="mailto:jordan.dworkin@coefficientgiving.org" title="Contact" style="text-decoration:none;">&#9993;</a>';
         }
     }
 
