@@ -23,6 +23,7 @@ from config import (
     AWARDS_FISCAL_YEARS,
     CURRENT_FY,
     USASPENDING_AWARD_TYPE_CODES,
+    USASPENDING_AWARD_SEARCH_URL,
     USASPENDING_TIME_URL,
 )
 
@@ -186,3 +187,80 @@ def fetch_all_unified(
         if frames:
             results[key] = pd.concat(frames, ignore_index=True)
     return results
+
+
+def fetch_unified_freshness(
+    agency_key: str, fiscal_year: int, force: bool = False,
+) -> str | None:
+    """
+    Query per-award endpoint to find max last_modified_date for an agency's
+    current-FY awards.  Returns ISO date string or None.
+    """
+    if fiscal_year != CURRENT_FY:
+        return None
+
+    cfg = USA_UNIFIED_CONFIG[agency_key]
+    cache_file = CACHE_DIR / f"{agency_key}_fy{fiscal_year}_freshness.json"
+
+    if not force and _cache_is_fresh(cache_file, fiscal_year):
+        with open(cache_file) as f:
+            cached = json.load(f)
+        return cached.get("max_last_modified_date")
+
+    start = f"{fiscal_year - 1}-10-01"
+    end = f"{fiscal_year}-09-30"
+
+    filters = {
+        "agencies": cfg["agencies"],
+        "award_type_codes": USASPENDING_AWARD_TYPE_CODES,
+        "time_period": [
+            {"start_date": start, "end_date": end, "date_type": "new_awards_only"}
+        ],
+    }
+    if cfg.get("cfda"):
+        filters["program_numbers"] = cfg["cfda"]
+
+    payload = {
+        "filters": filters,
+        "fields": ["Award ID", "Last Modified Date"],
+        "limit": 1,
+        "page": 1,
+        "sort": "Last Modified Date",
+        "order": "desc",
+    }
+
+    try:
+        print(f"  Fetching USASpending (unified) freshness {agency_key} FY{fiscal_year}...")
+        resp = requests.post(USASPENDING_AWARD_SEARCH_URL, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        print(f"  WARNING: freshness fetch failed for {agency_key}: {exc}")
+        return None
+
+    results = data.get("results", [])
+    if not results:
+        return None
+
+    raw_date = results[0].get("Last Modified Date", "")
+    max_date = raw_date[:10] if raw_date else None
+
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(cache_file, "w") as f:
+        json.dump({"max_last_modified_date": max_date}, f)
+
+    return max_date
+
+
+def fetch_all_unified_freshness(
+    agency_keys: list[str] | None = None,
+    force: bool = False,
+) -> dict[str, str]:
+    """Fetch freshness (max last_modified_date) for all unified agencies."""
+    keys = agency_keys or list(USA_UNIFIED_CONFIG.keys())
+    freshness = {}
+    for key in keys:
+        result = fetch_unified_freshness(key, CURRENT_FY, force=force)
+        if result:
+            freshness[key] = result
+    return freshness

@@ -589,7 +589,7 @@
             : `FY${priorFys[0]}`;
 
         const heading = document.getElementById('overview-agency-heading');
-        heading.textContent = `Individual Agency Trends`;
+        heading.textContent = `Individual Agency Obligation Trends`;
 
         for (const key of Object.keys(cfg.agencies)) {
             if (!DATA.spenddown[key]) continue;

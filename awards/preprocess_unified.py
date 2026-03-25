@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from awards.fetch_usaspending_unified import fetch_all_unified
+from awards.fetch_usaspending_unified import fetch_all_unified, fetch_all_unified_freshness
 from awards.transform import build_award_series, build_award_summary
 
 PROCESSED_DIR = Path(__file__).parent / "processed"
@@ -57,8 +57,13 @@ def main(
             "metric_label_short": "Awards",
         }
 
+    print("Fetching USASpending freshness data...")
+    freshness = fetch_all_unified_freshness(agency_keys=list(raw.keys()), force=force)
+    for key, dt in freshness.items():
+        print(f"  {key}: last modified {dt}")
+
     print("Building cumulative series...")
-    series = build_award_series(raw)
+    series = build_award_series(raw, freshness_data=freshness)
     print(f"  {len(series)} series rows")
 
     summary = build_award_summary(series)
