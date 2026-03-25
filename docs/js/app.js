@@ -747,12 +747,19 @@
             const agencyAwards = DATA.awards[agencyKey];
             if (!agencyAwards) return;
 
-            let csv = 'fiscal_year,fy_day,cumulative_count,cumulative_dollars_m\n';
+            const hasCounts = agencyAwards.source_type !== 'usaspending';
+            let csv = hasCounts
+                ? 'fiscal_year,fy_day,cumulative_count,cumulative_dollars_m\n'
+                : 'fiscal_year,fy_day,cumulative_dollars_m\n';
             for (const [fy, yearData] of Object.entries(agencyAwards.years)) {
                 for (let i = 0; i < yearData.fy_days.length; i++) {
-                    const count = yearData.cumulative_count ? yearData.cumulative_count[i] : '';
                     const dollars = yearData.cumulative_dollars_m ? yearData.cumulative_dollars_m[i] : '';
-                    csv += `${fy},${yearData.fy_days[i]},${count},${dollars}\n`;
+                    if (hasCounts) {
+                        const count = yearData.cumulative_count ? yearData.cumulative_count[i] : '';
+                        csv += `${fy},${yearData.fy_days[i]},${count},${dollars}\n`;
+                    } else {
+                        csv += `${fy},${yearData.fy_days[i]},${dollars}\n`;
+                    }
                 }
             }
 
@@ -915,6 +922,49 @@
                 return '<td class="' + (c.cls || '') + '">' + formatted + '</td>';
             }).join('') + '</tr>';
         }).join('');
+    }
+
+    // ── Data Table CSV Downloads ──
+
+    function downloadTableCSV(tableId, filename) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const rows = table.querySelectorAll('tr');
+        let csv = '';
+        rows.forEach(function(row) {
+            const cells = row.querySelectorAll('th, td');
+            const vals = [];
+            cells.forEach(function(cell) {
+                let text = cell.textContent.trim();
+                // Escape quotes and wrap if contains comma
+                if (text.indexOf(',') !== -1 || text.indexOf('"') !== -1) {
+                    text = '"' + text.replace(/"/g, '""') + '"';
+                }
+                vals.push(text);
+            });
+            csv += vals.join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    var obligTableBtn = document.getElementById('btn-obligations-table-csv');
+    if (obligTableBtn) {
+        obligTableBtn.addEventListener('click', function() {
+            downloadTableCSV('table-obligations-series', 'obligation_series.csv');
+        });
+    }
+
+    var awardsTableBtn = document.getElementById('btn-awards-table-csv');
+    if (awardsTableBtn) {
+        awardsTableBtn.addEventListener('click', function() {
+            downloadTableCSV('table-awards-series', 'award_series.csv');
+        });
     }
 
     // ── Awards: FY Day Ticks ──

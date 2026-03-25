@@ -192,6 +192,7 @@
                             <tr><td>USDA</td><td>TRACCTs 1400, 1500, 1502</td><td>Agricultural Research Service + National Institute of Food and Agriculture</td></tr>
                         </table>
 
+                        <!-- MAINTENANCE: Update FY range below when BAND_YEARS_EXCLUDE changes in config.py -->
                         <p><strong>Historical range.</strong> The shaded band on spend-down charts shows the minimum-to-maximum range across
                         prior fiscal years (FY2016&ndash;FY2024). The dashed line shows the average. These provide context for whether
                         current-year spending is within normal bounds. FY2016 and FY2017 data is available at non-quarterly months only
@@ -211,6 +212,7 @@
                             <tbody></tbody>
                         </table>
                     </div>
+                    <div style="margin-top: 0.5rem;"><button class="btn-export" id="btn-obligations-table-csv">Download CSV</button></div>
 
                     <div class="glossary">
                         <h3>Glossary</h3>
@@ -253,6 +255,11 @@
                         Dollar amounts represent the initial obligation recorded for each award, extracted from
                         the per-year funding breakdown in the NSF API. For standard grants, this equals the full award value;
                         for continuing grants, it is the first-year increment.
+                        A small proportion of awards (~1%, stable across all fiscal years) lack per-year obligation data
+                        and are included in award counts but excluded from dollar totals. This is likely a conservative choice:
+                        the alternative field available for these awards tended to overstate dollar amounts slightly more
+                        in earlier fiscal years, so including it would marginally inflate historical baselines relative to
+                        more recent years.
                         Data is available daily from FY2016 onward.</p>
 
                         <p><strong>DOE Office of Science, NASA Science, and USDA</strong> data comes from
@@ -262,14 +269,17 @@
                         Data is reported monthly. USASpending coverage begins in FY2017&ndash;2019 depending on the agency;
                         years with incomplete data are automatically excluded from the historical baseline.</p>
 
-                        <p><strong>Comparability.</strong> All three data sources capture initial competitive awards or new award obligations,
-                        excluding non-competing continuations. NIH data includes Type 1 (new) and Type 2 (competing renewal) grants.
-                        NSF captures all new award decisions. USASpending is filtered to new awards only.</p>
+                        <p><strong>Comparability.</strong> Each source is filtered to approximate new competitive grant activity,
+                        but the exact construct differs: NIH includes Type 1 (new) and Type 2 (competing renewal) grants from NIH Reporter,
+                        NSF includes awards by decision date from the NSF Awards API, and USASpending is filtered to new award obligations.
+                        These series are broadly comparable as measures of new competitive grant activity, but they are not identical
+                        administrative constructs.</p>
 
+                        <!-- MAINTENANCE: Update FY ranges below when BAND_YEARS_EXCLUDE changes in config.py -->
                         <p><strong>Historical range.</strong> The shaded band on award charts shows the minimum-to-maximum range across
                         available prior fiscal years. The dashed line shows the average. Because USASpending data availability varies by agency,
                         the baseline period may differ: NIH and NSF use FY2016&ndash;2024, while DOE begins FY2019, USDA begins FY2018,
-                        and NASA begins FY2017. Earlier years are excluded due to incomplete data coverage.</p>
+                        and NASA begins FY2017. Years with incomplete source coverage are automatically excluded from the baseline.</p>
 
                         <p><strong>Normalization.</strong> To compare across years and agencies, cumulative new award dollars are expressed
                         as a percentage of the discretionary appropriation (SF-133 Line 1100) for the relevant research component.
@@ -281,7 +291,13 @@
                         to produce the &ldquo;% of average pace&rdquo; metric. Metric cards use the same normalization: year-over-year and
                         vs-average comparisons are based on appropriation-normalized values, not raw dollar amounts.
                         Agencies whose average appropriation share is below 0.05% at a given point are excluded from the overview chart
-                        to avoid noisy ratios from small denominators.</p>
+                        to avoid noisy ratios from small denominators.
+                        Year-over-year and versus-average comparisons in the metric cards are expressed as percentage-point differences,
+                        while the overview chart expresses pace as a ratio relative to the historical average.</p>
+
+                        <p><strong>Update cadence.</strong> Obligations reflect monthly SF-133 reporting. Award data reflect source-specific
+                        agency feeds and may cover a more recent period. Where the latest source period is partial, the final
+                        point is shown provisionally.</p>
                     </div>
 
                     <h2 class="section-heading">Award Time Series</h2>
@@ -293,6 +309,7 @@
                             <tbody></tbody>
                         </table>
                     </div>
+                    <div style="margin-top: 0.5rem;"><button class="btn-export" id="btn-awards-table-csv">Download CSV</button></div>
 
                     <div class="glossary">
                         <h3>Glossary</h3>
@@ -301,7 +318,7 @@
                             <dd>A Type 1 (new) or Type 2 (competing renewal) grant, as classified by NIH. Excludes non-competing continuations, supplements, and subprojects.</dd>
 
                             <dt>New Award (NSF)</dt>
-                            <dd>An award whose decision date falls within the fiscal year. Continuing grant increments retain the original award's start date and are not double-counted.</dd>
+                            <dd>An award whose decision date falls within the fiscal year, deduplicated at the award level. Continuing grant increments are counted as separate awards only if they receive distinct award IDs from NSF.</dd>
 
                             <dt>New Grant Obligation (USASpending)</dt>
                             <dd>A project grant or cooperative agreement obligation classified as a new award by USASpending.gov, excluding modifications to existing awards.</dd>

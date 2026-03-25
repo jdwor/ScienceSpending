@@ -267,8 +267,8 @@ def _load_approp_lookup():
         agency = row["agency"]
         fy = int(row["fiscal_year"])
         # Use discretionary appropriation (Line 1100) as denominator.
-        # Mandatory (Line 1200) is excluded because it appears inconsistently
-        # across agencies and years, which would distort cross-year comparisons.
+        # Mandatory (Line 1200) is excluded because competitive grants are
+        # funded from discretionary accounts; mandatory supports earmarked programs.
         val = row.get("approp_disc_raw")
         if pd.notna(val) and val > 0:
             lookup.setdefault(agency, {})[fy] = float(val)

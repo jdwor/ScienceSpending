@@ -154,12 +154,17 @@ python3 -m awards.preprocess
 python3 build.py
 ```
 
-### 4. Verify
+### 4. Update hardcoded FY ranges in `docs/index.html`
+
+Search for `MAINTENANCE: Update FY range` comments in the HTML. Update the hardcoded range text (e.g., "FY2016–FY2024" → "FY2016–FY2025") to match the new `BAND_YEARS_EXCLUDE` setting.
+
+### 5. Verify
 
 - New FY appears as highlighted line on charts
 - Previous FY moves from highlighted to band-year
 - Metric cards show new FY values
 - Historical envelope band now includes the prior-prior year
+- Methodology text shows correct FY range for historical band
 
 ---
 

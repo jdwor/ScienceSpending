@@ -132,12 +132,13 @@ def _extract_records(
                 amt = int(float(parts[1].strip().replace("$", "").replace(",", "")))
             except (ValueError, IndexError):
                 amt = 0
-        # Fall back to estimatedTotalAmt only if fundsObligated is empty
-        if amt == 0:
-            try:
-                amt = int(a.get("estimatedTotalAmt", "0").replace(",", ""))
-            except (ValueError, AttributeError):
-                amt = 0
+        # Awards without per-year obligation data (fundsObligated empty) are
+        # kept with amt=0 so they contribute to counts but not dollars.
+        # This affects ~1% of awards consistently across all FYs.
+        # The alternative (falling back to estimatedTotalAmt) was removed
+        # because that field can overstate multi-year grants and did so
+        # slightly more in earlier years, creating a small upward bias
+        # in historical baselines.
 
         # Convert award decision date from MM/DD/YYYY to YYYY-MM-DD
         date_raw = a.get("date", "")
