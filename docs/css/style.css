@@ -302,6 +302,47 @@ body {
     font-weight: 600;
 }
 
+.intro-text p {
+    margin-top: 0.75rem;
+}
+
+.intro-text table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    margin-top: 0.75rem;
+}
+
+.intro-text th,
+.intro-text td {
+    text-align: left;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.intro-text th {
+    font-weight: 600;
+    color: var(--color-text);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ── Data & Methods View Switcher ── */
+.data-view-switcher {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+}
+
+.data-view-label {
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
 /* ── Chart Containers ── */
 .chart-card {
     background: var(--color-surface);
