@@ -178,15 +178,15 @@ def build_multi_agency_data(obligation_series):
 
         means = compute_mean_lookup(agency_all, all_fys, show_pct=True)
 
-        x_vals = [1]
-        y_vals = [100.0]
+        x_vals = []
+        y_vals = []
 
         for _, row in agency_fy.iterrows():
             m = row["period_month"]
             avg = means.get(str(int(m)))
             curr_pct = row["pct_obligated"]
             if avg and avg > 0 and curr_pct is not None:
-                pct_of_mean = curr_pct / avg * 100
+                pct_of_mean = curr_pct / avg * 100 - 100
             else:
                 pct_of_mean = None
             if pct_of_mean is not None:

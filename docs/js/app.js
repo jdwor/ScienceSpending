@@ -55,6 +55,11 @@
         return "$" + amount.toLocaleString('en-US', { maximumFractionDigits: 0 });
     }
 
+    function fmtSigned(v) {
+        var s = Math.abs(v).toFixed(1);
+        return v > 0 ? '+' + s + '%' : v < 0 ? '\u2212' + s + '%' : '0.0%';
+    }
+
     function fyMonthLabels() {
         return { 1: "Oct", 2: "Nov", 3: "Dec", 4: "Jan", 5: "Feb", 6: "Mar",
                  7: "Apr", 8: "May", 9: "Jun", 10: "Jul", 11: "Aug", 12: "Sep" };
@@ -270,10 +275,10 @@
         const ticks = tickArrays();
         const traces = [];
 
-        // 100% reference line — spans full FY (start of Oct to end of Sep)
+        // 0% "on pace" reference line — spans full FY (start of Oct to end of Sep)
         traces.push({
             x: [0, 12],
-            y: [100, 100],
+            y: [0, 0],
             mode: 'lines',
             line: { color: '#9ca3af', width: 1, dash: 'dot' },
             showlegend: false,
@@ -289,13 +294,13 @@
             const months = trace.months;
             const vals = trace.pct_of_mean;
 
-            // Lead-in (Oct-Nov) — faded dashed
-            const leadX = months.filter(m => m <= 2);
-            const leadY = vals.slice(0, leadX.length);
-            if (leadX.length >= 2) {
+            const labels = fyMonthLabels();
+
+            // Dashed lead-in from start of Oct (x=0) at midpoint to first real data point
+            if (months.length > 0) {
                 traces.push({
-                    x: leadX,
-                    y: leadY,
+                    x: [0, months[0]],
+                    y: [0, vals[0]],
                     mode: 'lines',
                     line: { color: agency.color, width: 1.5, dash: 'dot' },
                     opacity: 0.35,
@@ -304,22 +309,18 @@
                 });
             }
 
-            // Main segment
-            const mainStartIdx = leadX.length - 1;
-            const mainX = months.slice(mainStartIdx);
-            const mainY = vals.slice(mainStartIdx);
-            const labels = fyMonthLabels();
-            const mainText = mainX.map(m => labels[m] || '');
+            const mainText = months.map(m => labels[m] || '');
 
             traces.push({
-                x: mainX,
-                y: mainY,
+                x: months,
+                y: vals,
                 text: mainText,
                 mode: 'lines+markers',
                 name: agency.display_name,
                 line: { color: agency.color, width: 2.5 },
                 marker: { size: 5, color: agency.color },
-                hovertemplate: '<b>' + agency.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                customdata: vals.map(v => fmtSigned(v)),
+                hovertemplate: '<b>' + agency.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agency.color },
             });
         }
@@ -348,9 +349,10 @@
             }),
             yaxis: Object.assign({}, baseAxisStyle(), {
                 ticksuffix: '%',
-                range: [-6, 200],
+                tickformat: '+d',
+                range: [-106, 106],
                 dtick: 20,
-                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
+                title: { text: 'vs. Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -372,9 +374,9 @@
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
-                    text: bandLabel + ' avg.',
+                    text: 'On pace (' + bandLabel + ' avg.)',
                     x: 12,
-                    y: 100,
+                    y: 0,
                     xanchor: 'right',
                     yanchor: 'bottom',
                     yshift: 4,
@@ -992,10 +994,10 @@
         const traces = [];
         const currentFy = cfg.current_fy;
 
-        // 100% reference line — spans full FY (Oct 1 = day 1 to Sep 30 = day 365)
+        // 0% "on pace" reference line — spans full FY (Oct 1 = day 1 to Sep 30 = day 365)
         traces.push({
             x: [1, 365],
-            y: [100, 100],
+            y: [0, 0],
             mode: 'lines',
             line: { color: '#9ca3af', width: 1, dash: 'dot' },
             showlegend: false,
@@ -1046,7 +1048,7 @@
                 if (closestMean == null || closestMean < 0.05) continue;
 
                 xVals.push(day);
-                yVals.push(currVal / closestMean * 100);
+                yVals.push(Math.round((currVal / closestMean * 100 - 100) * 100) / 100);
             }
 
             if (xVals.length === 0) continue;
@@ -1105,6 +1107,19 @@
                 plotY = plotY.slice(0, -1);
             }
 
+            // Dashed lead-in from Oct 1 (day 1) at midpoint to first real data point
+            if (plotX.length > 0) {
+                traces.push({
+                    x: [1, plotX[0]],
+                    y: [0, plotY[0]],
+                    mode: 'lines',
+                    line: { color: agencyCfg.color, width: 1.5, dash: 'dot' },
+                    opacity: 0.35,
+                    showlegend: false,
+                    hoverinfo: 'skip',
+                });
+            }
+
             traces.push({
                 x: plotX,
                 y: plotY,
@@ -1113,7 +1128,8 @@
                 line: { color: agencyCfg.color, width: 2.5 },
                 marker: { size: isDaily ? 4 : 5, color: agencyCfg.color },
                 text: plotX.map(d => fyDayToMonth(d)),
-                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                customdata: plotY.map(v => fmtSigned(v)),
+                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agencyCfg.color },
             });
             // Line-only tail extending beyond last milestone (no dot)
@@ -1125,7 +1141,8 @@
                     name: agencyCfg.display_name,
                     line: { color: agencyCfg.color, width: 2.5 },
                     text: tailX.map(d => fyDayToMonth(d)),
-                    hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                    customdata: tailY.map(v => fmtSigned(v)),
+                    hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                     hoverlabel: { bordercolor: agencyCfg.color },
                     showlegend: false,
                 });
@@ -1148,9 +1165,10 @@
             }),
             yaxis: Object.assign({}, baseAxisStyle(), {
                 ticksuffix: '%',
-                range: [-6, 200],
+                tickformat: '+d',
+                range: [-106, 106],
                 dtick: 20,
-                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
+                title: { text: 'vs. Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: {
                 orientation: 'h',
@@ -1172,9 +1190,9 @@
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
                 {
-                    text: 'Historical avg.',
+                    text: 'On pace (historical avg.)',
                     x: 365,
-                    y: 100,
+                    y: 0,
                     xanchor: 'right',
                     yanchor: 'bottom',
                     yshift: 4,
@@ -1661,7 +1679,7 @@
         var currentFy = cfg.current_fy;
 
         traces.push({
-            x: [1, 365], y: [100, 100],
+            x: [1, 365], y: [0, 0],
             mode: 'lines', line: { color: '#9ca3af', width: 1, dash: 'dot' },
             showlegend: false, hoverinfo: 'skip',
         });
@@ -1700,7 +1718,7 @@
                 }
                 if (closestMean == null || closestMean < 0.05) continue;
                 xVals.push(day);
-                yVals.push(currVal / closestMean * 100);
+                yVals.push(Math.round((currVal / closestMean * 100 - 100) * 100) / 100);
             }
             if (xVals.length === 0) continue;
 
@@ -1722,7 +1740,8 @@
                 line: { color: agencyCfg.color, width: 2.5 },
                 marker: { size: 5, color: agencyCfg.color },
                 text: plotX.map(function(d) { return fyDayToMonth(d); }),
-                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                customdata: plotY.map(function(v) { return fmtSigned(v); }),
+                hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agencyCfg.color },
             });
             if (tailX) {
@@ -1732,7 +1751,8 @@
                     name: agencyCfg.display_name,
                     line: { color: agencyCfg.color, width: 2.5 },
                     text: tailX.map(function(d) { return fyDayToMonth(d); }),
-                    hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{y:.1f}% of avg. pace<extra></extra>',
+                    customdata: tailY.map(function(v) { return fmtSigned(v); }),
+                    hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                     hoverlabel: { bordercolor: agencyCfg.color },
                     showlegend: false,
                 });
@@ -1748,8 +1768,8 @@
                 range: [-15, 380], showgrid: true,
             }),
             yaxis: Object.assign({}, baseAxisStyle(), {
-                ticksuffix: '%', range: [-6, 200], dtick: 20,
-                title: { text: '% of Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
+                ticksuffix: '%', tickformat: '+d', range: [-106, 106], dtick: 20,
+                title: { text: 'vs. Avg. Pace', font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
             legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5,
                       font: { family: FONT_SANS, size: 11, color: MUTED_COLOR } },
@@ -1759,7 +1779,7 @@
             height: isMobile() ? 340 : 460,
             margin: { l: 60, r: 12, t: 8, b: 95 },
             annotations: [
-                { text: 'Historical avg.', x: 365, y: 100, xanchor: 'right', yanchor: 'bottom', yshift: 4,
+                { text: 'On pace (historical avg.)', x: 365, y: 0, xanchor: 'right', yanchor: 'bottom', yshift: 4,
                   showarrow: false, font: { family: FONT_SANS, size: 11, color: '#9ca3af' } },
                 sourceAnnotation('Source: USASpending.gov', -0.30),
                 ...awardMonthLabels(false),
