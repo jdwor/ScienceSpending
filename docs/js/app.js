@@ -7,11 +7,11 @@
 
     // ── Shared chart styling ──
     const FONT_SANS = "Inter, -apple-system, BlinkMacSystemFont, sans-serif";
-    const FONT_SERIF = "Source Serif 4, Georgia, serif";
-    const TEXT_COLOR = "#0f1419";
-    const MUTED_COLOR = "#6b7280";
-    const GRID_COLOR = "rgba(217,214,208,0.15)";
-    const AXIS_LINE_COLOR = "#d9d6d0";
+    const FONT_SERIF = "Newsreader, Georgia, serif";
+    const TEXT_COLOR = "#333333";
+    const MUTED_COLOR = "#606060";
+    const GRID_COLOR = "rgba(215,215,215,0.2)";
+    const AXIS_LINE_COLOR = "#d7d7d7";
     const PRIOR_RANGE_COLOR = "rgba(160, 175, 200, 0.15)";
     const HIGHLIGHT_COLORS = { 2025: "#94a3b8" };
 
@@ -365,7 +365,7 @@
             hovermode: 'closest',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#d9d6d0',
+                bordercolor: '#d7d7d7',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
             plot_bgcolor: '#fafaf9',
@@ -510,16 +510,16 @@
             : 'Cumulative obligations in billions of dollars by fiscal year month.';
         const mobile = isMobile();
         const detailTitle = mobile
-            ? agency.display_name + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>'
+            ? agency.display_name + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>'
             : agency.display_name + ' \u2014 Obligation Spend-Down'
-            + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
+            + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
         const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")].filter(Boolean);
         annotations.push(...obligationMonthLabels(compact));
 
         const layout = {
             title: compact ? {
                 text: agency.display_name,
-                font: { family: FONT_SANS, size: 12, weight: 600, color: TEXT_COLOR },
+                font: { family: FONT_SERIF, size: 13, weight: 600, color: TEXT_COLOR },
                 x: 0.02,
                 xanchor: 'left',
             } : {
@@ -556,7 +556,7 @@
             hovermode: compact ? 'closest' : 'x unified',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#d9d6d0',
+                bordercolor: '#d7d7d7',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
             plot_bgcolor: '#fafaf9',
@@ -1244,7 +1244,7 @@
             hovermode: 'closest',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#d9d6d0',
+                bordercolor: '#d7d7d7',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
             plot_bgcolor: '#fafaf9',
@@ -1433,14 +1433,14 @@
             : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
         const mobileAwd = isMobile();
         const awardsDetailTitle = mobileAwd
-            ? agencyCfg.display_name + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
+            ? agencyCfg.display_name + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
             : agencyCfg.display_name + ' \u2014 New Awards'
-            + '<br><span style="font-size:11px;font-weight:400;color:#6b7280;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
+            + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
 
         const layout = {
             title: compact ? {
                 text: agencyCfg.display_name,
-                font: { family: FONT_SANS, size: 12, weight: 600, color: TEXT_COLOR },
+                font: { family: FONT_SERIF, size: 13, weight: 600, color: TEXT_COLOR },
                 x: 0.02,
                 xanchor: 'left',
             } : {
@@ -1478,7 +1478,7 @@
             hovermode: compact ? 'closest' : 'x unified',
             hoverlabel: {
                 bgcolor: 'white',
-                bordercolor: '#d9d6d0',
+                bordercolor: '#d7d7d7',
                 font: { family: FONT_SANS, size: 12, color: TEXT_COLOR },
             },
             plot_bgcolor: '#fafaf9',
@@ -1843,7 +1843,7 @@
             legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5,
                       font: { family: FONT_SANS, size: 11, color: MUTED_COLOR } },
             hovermode: 'closest',
-            hoverlabel: { bgcolor: 'white', bordercolor: '#d9d6d0', font: { family: FONT_SANS, size: 12, color: TEXT_COLOR } },
+            hoverlabel: { bgcolor: 'white', bordercolor: '#d7d7d7', font: { family: FONT_SANS, size: 12, color: TEXT_COLOR } },
             plot_bgcolor: '#fafaf9', paper_bgcolor: 'white',
             height: isMobile() ? 340 : 460,
             margin: { l: 60, r: 12, t: 8, b: 95 },
@@ -1984,7 +1984,7 @@
         var layout = {
             title: compact ? {
                 text: agencyCfg.display_name,
-                font: { family: FONT_SANS, size: 12, weight: 600, color: TEXT_COLOR },
+                font: { family: FONT_SERIF, size: 13, weight: 600, color: TEXT_COLOR },
                 x: 0.02, xanchor: 'left',
             } : {
                 text: agencyCfg.display_name + ' \u2014 USASpending',
@@ -2005,7 +2005,7 @@
             legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5,
                       font: { family: FONT_SANS, size: compact ? 9 : 11, color: MUTED_COLOR }, bgcolor: 'rgba(0,0,0,0)' },
             hovermode: compact ? 'closest' : 'x unified',
-            hoverlabel: { bgcolor: 'white', bordercolor: '#d9d6d0', font: { family: FONT_SANS, size: 12, color: TEXT_COLOR } },
+            hoverlabel: { bgcolor: 'white', bordercolor: '#d7d7d7', font: { family: FONT_SANS, size: 12, color: TEXT_COLOR } },
             plot_bgcolor: '#fafaf9', paper_bgcolor: 'white',
             height: height,
             margin: { l: compact ? 45 : 60, r: 12, t: compact ? 38 : 72, b: compact ? 65 : 110 },

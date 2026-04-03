@@ -11,19 +11,19 @@
 }
 
 :root {
-    --color-text: #0f1419;
-    --color-text-secondary: #32373f;
-    --color-text-muted: #6b7280;
+    --color-text: #333333;
+    --color-text-secondary: #4a4a4a;
+    --color-text-muted: #606060;
     --color-text-faint: #9ca3af;
-    --color-bg: #f3f5f6;
+    --color-bg: #f6f6f6;
     --color-surface: #ffffff;
-    --color-surface-alt: #fafaf9;
-    --color-border: #d9d6d0;
-    --color-border-light: #e5e3e0;
+    --color-surface-alt: #f6f6f6;
+    --color-border: #d7d7d7;
+    --color-border-light: #ececec;
     --color-accent: #1e5a96;
-    --color-positive: #2b7a6b;
+    --color-positive: #064d49;
     --color-negative: #b35a3a;
-    --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --container-width: 1060px;
     --container-wide: 1160px;
@@ -73,9 +73,10 @@ body {
 .site-title {
     font-family: var(--font-serif);
     font-size: var(--text-2xl);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--color-text);
-    line-height: 1.1;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
     letter-spacing: -0.03em;
     margin-bottom: 1.5rem;
 }
@@ -192,6 +193,7 @@ body {
     font-size: var(--text-xl);
     font-weight: 600;
     color: var(--color-text);
+    letter-spacing: -0.02em;
     margin-top: 3rem;
     margin-bottom: 0.75rem;
     padding-bottom: 0;
