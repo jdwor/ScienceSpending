@@ -613,57 +613,70 @@
         const cfg = DATA.config;
 
         if (!summary || summary.error) {
-            container.innerHTML = '<div class="metric-card"><div class="metric-value">No data</div></div>';
+            container.innerHTML = '';
             return;
         }
 
-        function card(label, value, delta, deltaDir) {
-            let deltaHtml = '';
-            if (delta && delta !== 'N/A') {
-                deltaHtml = `<div class="metric-delta ${deltaDir || ''}">${delta}</div>`;
-            }
-            return `<div class="metric-card">
-                <div class="metric-label">${label}</div>
-                <div class="metric-value">${value}</div>
-                ${deltaHtml}
-            </div>`;
+        function relPct(current, benchmark) {
+            if (current == null || benchmark == null || benchmark === 0) return null;
+            const rel = (current / benchmark - 1) * 100;
+            const sign = rel >= 0 ? '+' : '';
+            return { str: sign + rel.toFixed(0) + '%', dir: rel < 0 ? 'negative' : 'positive' };
         }
 
-        const pct = summary.pct_obligated;
-        const pctStr = pct != null ? pct.toFixed(1) + '%' : 'N/A';
+        const rows = [];
 
-        let yoyStr = 'N/A';
-        let yoyDir = '';
-        if (summary.yoy_diff != null && summary.yoy_rel != null) {
-            const yoySign = summary.yoy_diff >= 0 ? '+' : '';
-            const yoyRelSign = summary.yoy_rel >= 0 ? '+' : '';
-            yoyStr = yoySign + summary.yoy_diff.toFixed(1) + 'pp (' + yoyRelSign + summary.yoy_rel.toFixed(1) + '%)';
-            yoyDir = summary.yoy_diff < 0 ? 'negative' : 'positive';
+        // Row: % of appropriation
+        if (summary.pct_obligated != null) {
+            const r = summary.mean_prior_pct > 0 ? relPct(summary.pct_obligated, summary.mean_prior_pct) : null;
+            rows.push({
+                label: '% of Appropriation',
+                current: summary.pct_obligated.toFixed(1) + '%',
+                avg: summary.mean_prior_pct != null ? summary.mean_prior_pct.toFixed(1) + '%' : 'N/A',
+                vs: r,
+            });
         }
 
-        let medStr = 'N/A';
-        let medDir = '';
-        if (summary.mean_diff != null && summary.mean_rel != null) {
-            const medSign = summary.mean_diff >= 0 ? '+' : '';
-            const medRelSign = summary.mean_rel >= 0 ? '+' : '';
-            medStr = medSign + summary.mean_diff.toFixed(1) + 'pp (' + medRelSign + summary.mean_rel.toFixed(1) + '%)';
-            medDir = summary.mean_diff < 0 ? 'negative' : 'positive';
+        // Row: obligated dollars
+        if (summary.obligations_to_date != null) {
+            const meanDollars = summary.mean_obligations || null;
+            const r = meanDollars > 0 ? relPct(summary.obligations_to_date, meanDollars) : null;
+            rows.push({
+                label: 'Obligated',
+                current: formatDollars(summary.obligations_to_date),
+                avg: meanDollars != null ? formatDollars(meanDollars) : 'N/A',
+                vs: r,
+                vsSup: '†',
+                footnote: true,
+            });
         }
 
-        container.innerHTML =
-            card(`FY${cfg.current_fy} Appropriation`, formatDollars(summary.appropriations)) +
-            card(`Obligated through ${summary.latest_period}`, formatDollars(summary.obligations_to_date)) +
-            card('Percent Obligated', pctStr) +
-            card(`vs. FY${cfg.current_fy - 1}`, yoyStr, null, yoyDir) +
-            card('vs. Avg.', medStr, null, medDir);
+        const periodLabel = summary.latest_period || '';
+        let html = `<table class="awards-summary-table">
+            <thead><tr>
+                <th></th>
+                <th>To Date${periodLabel ? ' (' + periodLabel + ')' : ''}</th>
+                <th>Avg at This Point</th>
+                <th>vs. Avg</th>
+            </tr></thead><tbody>`;
 
-        const cards = container.querySelectorAll('.metric-card');
-        if (cards[3] && yoyDir) {
-            cards[3].querySelector('.metric-value').classList.add(yoyDir === 'negative' ? 'metric-neg' : 'metric-pos');
+        for (const row of rows) {
+            const vsClass = row.vs ? (row.vs.dir === 'negative' ? 'metric-neg' : 'metric-pos') : '';
+            const vsStr = row.vs ? row.vs.str : '';
+            const sup = row.vsSup ? '<sup>' + row.vsSup + '</sup>' : '';
+            html += `<tr>
+                <td class="awards-summary-label">${row.label}</td>
+                <td>${row.current}</td>
+                <td>${row.avg}</td>
+                <td class="${vsClass}">${vsStr}${sup}</td>
+            </tr>`;
         }
-        if (cards[4] && medDir) {
-            cards[4].querySelector('.metric-value').classList.add(medDir === 'negative' ? 'metric-neg' : 'metric-pos');
+
+        html += '</tbody></table>';
+        if (rows.some(r => r.footnote)) {
+            html += '<div class="summary-table-footnotes"><p><sup>†</sup> Affected by changes in annual appropriations</p></div>';
         }
+        container.innerHTML = html;
     }
 
     // ── Agency Detail (within Obligations tab) ──
@@ -1516,7 +1529,7 @@
         const cfg = DATA.config;
 
         if (!awards || !awards[agencyKey]) {
-            container.innerHTML = '<div class="metric-card"><div class="metric-value">No data</div></div>';
+            container.innerHTML = '';
             return;
         }
 
@@ -1524,81 +1537,87 @@
         const hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';
         const summ = summary ? summary[agencyKey] : null;
 
-        function card(label, value, delta, deltaDir) {
-            let deltaHtml = '';
-            if (delta) {
-                deltaHtml = `<div class="metric-delta ${deltaDir || ''}">${delta}</div>`;
-            }
-            return `<div class="metric-card">
-                <div class="metric-label">${label}</div>
-                <div class="metric-value">${value}</div>
-                ${deltaHtml}
-            </div>`;
-        }
-
         if (!summ) {
-            container.innerHTML = card('Status', 'No summary data');
+            container.innerHTML = '';
             return;
         }
 
-        let html = '';
-
-        // Card 1: Current FY cumulative new award dollars
-        const dollars = summ.cumul_dollars != null ? formatDollars(summ.cumul_dollars) : 'N/A';
-        html += card(`Awarded through ${summ.latest_date || 'latest'}`, dollars);
-
-        // Card 3: Percent of appropriation awarded
-        const pctApprop = summ.cumul_pct_approp != null ? summ.cumul_pct_approp.toFixed(1) + '%' : 'N/A';
-        html += card('Percent Awarded', pctApprop);
-
-        // Card 4: vs. prior year (pp + relative %)
-        let yoyStr = 'N/A';
-        let yoyDir = '';
-        if (summ.cumul_pct_approp != null && summ.prior_year_pct_approp != null) {
-            const diff = summ.cumul_pct_approp - summ.prior_year_pct_approp;
-            const rel = summ.prior_year_pct_approp !== 0 ? (diff / summ.prior_year_pct_approp * 100) : 0;
-            const diffSign = diff >= 0 ? '+' : '';
-            const relSign = rel >= 0 ? '+' : '';
-            yoyStr = diffSign + diff.toFixed(1) + 'pp (' + relSign + rel.toFixed(1) + '%)';
-            yoyDir = diff < 0 ? 'negative' : 'positive';
-        }
-        html += card(`vs. FY${cfg.current_fy - 1}`, yoyStr, null, yoyDir);
-
-        // Card 5: vs. historical mean (pp + relative %)
-        let medStr = 'N/A';
-        let medDir = '';
-        if (summ.cumul_pct_approp != null && summ.mean_pct_approp != null) {
-            const diff = summ.cumul_pct_approp - summ.mean_pct_approp;
-            const rel = summ.mean_pct_approp !== 0 ? (diff / summ.mean_pct_approp * 100) : 0;
-            const diffSign = diff >= 0 ? '+' : '';
-            const relSign = rel >= 0 ? '+' : '';
-            medStr = diffSign + diff.toFixed(1) + 'pp (' + relSign + rel.toFixed(1) + '%)';
-            medDir = diff < 0 ? 'negative' : 'positive';
-        }
-        html += card('vs. Avg.', medStr, null, medDir);
-
-        // Card 6: Award count (NIH/NSF only — inherently normalized)
-        if (hasCounts && summ.cumul_count) {
-            const count = summ.cumul_count.toLocaleString();
-            const meanCount = summ.mean_count ? Math.round(summ.mean_count).toLocaleString() : null;
-            let countDelta = '';
-            let countDir = '';
-            if (meanCount != null && summ.mean_count) {
-                countDelta = 'vs. avg. of ' + meanCount;
-                countDir = summ.cumul_count < summ.mean_count ? 'negative' : 'positive';
-            }
-            html += card(`FY${cfg.current_fy} Awards`, count, countDelta, countDir);
+        function relPct(current, benchmark) {
+            if (current == null || benchmark == null || benchmark === 0) return null;
+            const rel = (current / benchmark - 1) * 100;
+            const sign = rel >= 0 ? '+' : '';
+            return { str: sign + rel.toFixed(0) + '%', dir: rel < 0 ? 'negative' : 'positive' };
         }
 
+        const rows = [];
+
+        // Row: % of appropriation
+        if (summ.cumul_pct_approp != null) {
+            const r = summ.mean_pct_approp > 0 ? relPct(summ.cumul_pct_approp, summ.mean_pct_approp) : null;
+            rows.push({
+                label: '% of Appropriation',
+                current: summ.cumul_pct_approp.toFixed(1) + '%',
+                avg: summ.mean_pct_approp != null ? summ.mean_pct_approp.toFixed(1) + '%' : 'N/A',
+                vs: r,
+            });
+        }
+
+        // Row: award count (NIH/NSF only)
+        if (hasCounts && summ.cumul_count != null) {
+            const r = summ.mean_count > 0 ? relPct(summ.cumul_count, summ.mean_count) : null;
+            rows.push({
+                label: 'Award Count',
+                current: summ.cumul_count.toLocaleString(),
+                avg: summ.mean_count != null ? Math.round(summ.mean_count).toLocaleString() : 'N/A',
+                vs: r,
+                vsSup: '†',
+            });
+        }
+
+        // Row: award dollars
+        if (summ.cumul_dollars != null) {
+            const r = summ.mean_dollars > 0 ? relPct(summ.cumul_dollars, summ.mean_dollars) : null;
+            rows.push({
+                label: 'Award Dollars',
+                current: formatDollars(summ.cumul_dollars),
+                avg: summ.mean_dollars != null ? formatDollars(summ.mean_dollars) : 'N/A',
+                vs: r,
+                vsSup: '‡',
+            });
+        }
+
+        let dateLabel = '';
+        if (summ.latest_date) {
+            const [y, m, d] = summ.latest_date.split('-');
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            dateLabel = months[parseInt(m, 10) - 1] + ' ' + parseInt(d, 10);
+        }
+        let html = `<table class="awards-summary-table">
+            <thead><tr>
+                <th></th>
+                <th>To Date${dateLabel ? ' (' + dateLabel + ')' : ''}</th>
+                <th>Avg at This Point</th>
+                <th>vs. Avg</th>
+            </tr></thead><tbody>`;
+
+        for (const row of rows) {
+            const vsClass = row.vs ? (row.vs.dir === 'negative' ? 'metric-neg' : 'metric-pos') : '';
+            const vsStr = row.vs ? row.vs.str : 'N/A';
+            const sup = row.vsSup ? '<sup>' + row.vsSup + '</sup>' : '';
+            html += `<tr>
+                <td class="awards-summary-label">${row.label}</td>
+                <td>${row.current}</td>
+                <td>${row.avg}</td>
+                <td class="${vsClass}">${vsStr}${sup}</td>
+            </tr>`;
+        }
+
+        html += '</tbody></table>';
+        html += '<div class="summary-table-footnotes">';
+        if (hasCounts) html += '<p><sup>†</sup> Affected by changes in prevalence of multi-year funding</p>';
+        html += '<p><sup>‡</sup> Affected by changes in annual appropriations</p>';
+        html += '</div>';
         container.innerHTML = html;
-
-        const cards = container.querySelectorAll('.metric-card');
-        if (cards[2] && yoyDir) {
-            cards[2].querySelector('.metric-value').classList.add(yoyDir === 'negative' ? 'metric-neg' : 'metric-pos');
-        }
-        if (cards[3] && medDir) {
-            cards[3].querySelector('.metric-value').classList.add(medDir === 'negative' ? 'metric-neg' : 'metric-pos');
-        }
     }
 
     // ── Awards: Detail View ──

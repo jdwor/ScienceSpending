@@ -148,6 +148,34 @@ body {
     border-bottom-color: var(--color-accent);
 }
 
+/* ── Section Dividers ── */
+.section-divider {
+    display: flex;
+    align-items: center;
+    margin: 2.5rem 0;
+}
+
+.divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--color-border-light);
+}
+
+.divider-ornament {
+    padding: 0 1rem;
+    color: var(--color-text-faint);
+    font-size: 0.65rem;
+}
+
+.section-divider + .section-heading,
+.section-divider + .section-heading-inline {
+    margin-top: 0;
+}
+
+.section-divider + .section-heading-inline .section-heading {
+    margin-top: 0;
+}
+
 /* ── Tab Panels ── */
 .tab-panel {
     display: none;
@@ -436,7 +464,7 @@ body {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 1.0rem;
-    margin-bottom: 2.0rem;
+    margin-bottom: 0.75rem;
 }
 
 @media (max-width: 900px) {
@@ -485,6 +513,73 @@ body {
 
 .metric-value.metric-neg { color: var(--color-negative); }
 .metric-value.metric-pos { color: var(--color-positive); }
+
+/* ── Awards Summary Table ── */
+.awards-summary-table {
+    width: 100%;
+    grid-column: 1 / -1;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-family: var(--font-sans);
+    background: var(--color-surface);
+    border: 1px solid rgba(217, 214, 208, 0.25);
+    border-radius: var(--radius);
+    margin-bottom: 0.35rem;
+    overflow: hidden;
+}
+
+.awards-summary-table th {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    text-align: right;
+    padding: 0.75rem 1.25rem;
+    background: var(--color-surface-alt);
+    border-bottom: 1px solid rgba(217, 214, 208, 0.3);
+}
+
+.awards-summary-table th:first-child {
+    text-align: left;
+}
+
+.awards-summary-table td {
+    padding: 0.75rem 1.25rem;
+    text-align: right;
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text);
+}
+
+.awards-summary-table tr:not(:last-child) td {
+    border-bottom: 1px solid rgba(217, 214, 208, 0.15);
+}
+
+.awards-summary-table .awards-summary-label {
+    text-align: left;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.awards-summary-table .metric-neg { color: var(--color-negative); font-weight: 700; }
+.awards-summary-table .metric-pos { color: var(--color-positive); font-weight: 700; }
+
+.awards-summary-table td sup {
+    color: var(--color-text);
+    font-weight: 400;
+}
+
+.summary-table-footnotes {
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    margin: 0 0 0.5rem 0;
+    grid-column: 1 / -1;
+}
+
+.summary-table-footnotes p {
+    margin: 0;
+    line-height: 1.6;
+}
 
 /* ── Chart Controls ── */
 .chart-controls {

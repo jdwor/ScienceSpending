@@ -485,10 +485,9 @@ def build_awards_site_data(series_override=None, summary_override=None):
                 if fy not in BAND_YEARS_EXCLUDE and fy != CURRENT_FY
             ]
             pct_vals = []
+            dollar_vals = []
+            count_vals = []
             for fy in band:
-                fy_approp = agency_approp.get(fy)
-                if not fy_approp or fy_approp <= 0:
-                    continue
                 fy_data = agency_series_for_mean[
                     agency_series_for_mean["fiscal_year"] == fy
                 ].sort_values("fy_day")
@@ -499,12 +498,22 @@ def build_awards_site_data(series_override=None, summary_override=None):
                 if latest_day < days[0]:
                     continue
                 interp_dollars = float(np.interp(latest_day, days, dollars))
-                pct_vals.append(interp_dollars / fy_approp * 100)
+                dollar_vals.append(interp_dollars)
+                if "cumulative_count" in fy_data.columns:
+                    counts = fy_data["cumulative_count"].values
+                    count_vals.append(float(np.interp(latest_day, days, counts)))
+                fy_approp = agency_approp.get(fy)
+                if fy_approp and fy_approp > 0:
+                    pct_vals.append(interp_dollars / fy_approp * 100)
 
             if pct_vals:
                 rec["mean_pct_approp"] = round(float(np.mean(pct_vals)), 4)
             else:
                 rec["mean_pct_approp"] = None
+            if dollar_vals:
+                rec["mean_dollars"] = round(float(np.mean(dollar_vals)), 2)
+            if count_vals:
+                rec["mean_count"] = round(float(np.mean(count_vals)), 2)
 
             awards_summary[agency] = rec
 

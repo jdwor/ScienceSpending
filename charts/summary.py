@@ -56,14 +56,16 @@ def compute_agency_summary(
     ]
     prior_pct = prior["pct_obligated"].iloc[0] if not prior.empty else None
 
-    # Mean spend-down rate across band-eligible prior years at same period
+    # Mean spend-down rate and obligations across band-eligible prior years at same period
     # (must match the envelope computation, which excludes BAND_YEARS_EXCLUDE)
-    all_prior = agency_data[
+    all_prior_rows = agency_data[
         (~agency_data["fiscal_year"].isin(BAND_YEARS_EXCLUDE))
         & (agency_data["fiscal_year"] < current_fy)
         & (agency_data["period_month"] == latest_month)
-    ]["pct_obligated"]
+    ]
+    all_prior = all_prior_rows["pct_obligated"]
     mean_pct = all_prior.mean() if not all_prior.empty else None
+    mean_obligations = all_prior_rows["obligations"].mean() if not all_prior_rows.empty else None
 
     yoy_diff = (pct - prior_pct) if prior_pct is not None else None
     yoy_rel = (yoy_diff / prior_pct * 100) if prior_pct else None
@@ -81,6 +83,7 @@ def compute_agency_summary(
         "yoy_diff": yoy_diff,
         "yoy_rel": yoy_rel,
         "mean_prior_pct": mean_pct,
+        "mean_obligations": mean_obligations,
         "mean_diff": mean_diff,
         "mean_rel": mean_rel,
     }
