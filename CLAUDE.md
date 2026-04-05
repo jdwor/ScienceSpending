@@ -8,8 +8,11 @@ Static website tracking federal science spending via SF-133 obligation reports a
 # Check for new SF-133 data
 python3 data/download.py --check
 
-# Update awards data (auto-fetches if cache >24h old)
+# Update new-awards data (auto-fetches if cache >24h old)
 python3 -m awards.preprocess
+
+# Update all-awards data (new + continuing; separate cache)
+python3 -m awards.preprocess_all
 
 # Full obligations pipeline (download + parse + transform)
 python3 data/download.py --years 2026 --force

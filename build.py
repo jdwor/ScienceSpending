@@ -293,7 +293,12 @@ def _detect_reliable_years(agency_series, fiscal_years, current_fy):
         return fiscal_years
 
     threshold = peak * 0.25
-    return [fy for fy in fiscal_years if fy == current_fy or fy_totals.get(fy, 0) >= threshold]
+    return [
+        fy for fy in fiscal_years
+        if fy == current_fy
+        or fy in HIGHLIGHT_YEARS
+        or fy_totals.get(fy, 0) >= threshold
+    ]
 
 
 def build_awards_site_data(series_override=None, summary_override=None):
@@ -543,9 +548,15 @@ def _build_awards_envelope(agency_series, band_fys, y_col, scale=1):
     if not fy_arrays:
         return None
 
-    # Use the fy_days from the year with the most points as the canonical grid
+    # Use the fy_days from the year with the most points as the base grid,
+    # then extend to cover the full day range across all band years so the
+    # envelope never ends before a highlighted year's line does.
     canonical_fy = max(fy_arrays, key=lambda fy: len(fy_arrays[fy][0]))
     sample_days = list(fy_arrays[canonical_fy][0])
+    max_day = max(int(days[-1]) for days, _ in fy_arrays.values())
+    if sample_days and sample_days[-1] < max_day:
+        for d in range(sample_days[-1] + 1, max_day + 1):
+            sample_days.append(d)
 
     valid_days, min_vals, max_vals, med_vals = [], [], [], []
     for day in sample_days:
@@ -636,6 +647,29 @@ def main():
             site_data["awards_unified"] = unified_data
         if unified_summary:
             site_data["awards_unified_summary"] = unified_summary
+
+    # Add "all awards" data if available
+    all_awards_series_path = AWARDS_PROCESSED_DIR / "award_series_all.csv"
+    if all_awards_series_path.exists():
+        print("Loading all-awards data...")
+        from config import AWARDS_CONFIG as _acfg_aa, ALL_AWARDS_CONFIG as _aacfg
+        _saved_aa = {k: dict(v) for k, v in _acfg_aa.items()}
+        for k in _aacfg:
+            if k in _acfg_aa:
+                _acfg_aa[k] = {**_acfg_aa[k], **_aacfg[k], "source": "usaspending"}
+        try:
+            all_awards_data, all_awards_summary = build_awards_site_data(
+                series_override=all_awards_series_path,
+                summary_override=AWARDS_PROCESSED_DIR / "award_summary_all.csv",
+            )
+        except TypeError:
+            all_awards_data, all_awards_summary = {}, {}
+        for k in _saved_aa:
+            _acfg_aa[k] = _saved_aa[k]
+        if all_awards_data:
+            site_data["awards_all"] = all_awards_data
+        if all_awards_summary:
+            site_data["awards_all_summary"] = all_awards_summary
 
     SITE_DATA_DIR.mkdir(parents=True, exist_ok=True)
     out_path = SITE_DATA_DIR / "site_data.json"

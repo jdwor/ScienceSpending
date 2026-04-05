@@ -53,16 +53,25 @@ def _cal_month_to_fy_month(cal_month: int) -> int:
 
 
 def fetch_usaspending_awards(
-    agency_key: str, fiscal_year: int, force: bool = False
+    agency_key: str,
+    fiscal_year: int,
+    force: bool = False,
+    date_type: str = "new_awards_only",
+    cache_dir: Path | None = None,
 ) -> pd.DataFrame:
     """
     Fetch monthly grant obligation time series for one agency/FY.
+
+    Parameters:
+        date_type: USASpending date filter ("new_awards_only" or "action_date").
+        cache_dir: Override cache directory (for "all awards" pipeline).
 
     Returns DataFrame with columns:
         fiscal_year, fy_month, agency, obligation_amount
     """
     cfg = AWARDS_CONFIG[agency_key]
-    cache_file = _cache_path(agency_key, fiscal_year)
+    cdir = cache_dir or CACHE_DIR
+    cache_file = cdir / f"{agency_key}_fy{fiscal_year}.json"
 
     if not force and _cache_is_fresh(cache_file, fiscal_year):
         with open(cache_file) as f:
@@ -81,7 +90,7 @@ def fetch_usaspending_awards(
                     }
                 ],
                 "award_type_codes": USASPENDING_AWARD_TYPE_CODES,
-                "time_period": [{"start_date": start, "end_date": end, "date_type": "new_awards_only"}],
+                "time_period": [{"start_date": start, "end_date": end, "date_type": date_type}],
                 "program_numbers": cfg["cfda"],
             },
         }
@@ -118,7 +127,11 @@ def fetch_usaspending_awards(
 
 
 def fetch_usaspending_freshness(
-    agency_key: str, fiscal_year: int, force: bool = False,
+    agency_key: str,
+    fiscal_year: int,
+    force: bool = False,
+    date_type: str = "new_awards_only",
+    cache_dir: Path | None = None,
 ) -> str | None:
     """
     Query the per-award endpoint to find the max last_modified_date for
@@ -130,7 +143,8 @@ def fetch_usaspending_freshness(
     if fiscal_year != CURRENT_FY:
         return None
 
-    cache_file = CACHE_DIR / f"{agency_key}_fy{fiscal_year}_freshness.json"
+    cdir = cache_dir or CACHE_DIR
+    cache_file = cdir / f"{agency_key}_fy{fiscal_year}_freshness.json"
 
     if not force and _cache_is_fresh(cache_file, fiscal_year):
         with open(cache_file) as f:
@@ -151,7 +165,7 @@ def fetch_usaspending_freshness(
             ],
             "award_type_codes": USASPENDING_AWARD_TYPE_CODES,
             "time_period": [
-                {"start_date": start, "end_date": end, "date_type": "new_awards_only"}
+                {"start_date": start, "end_date": end, "date_type": date_type}
             ],
             "program_numbers": cfg["cfda"],
         },
@@ -190,6 +204,8 @@ def fetch_usaspending_all(
     agency_keys: list[str] | None = None,
     fiscal_years: list[int] | None = None,
     force: bool = False,
+    date_type: str = "new_awards_only",
+    cache_dir: Path | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Fetch USASpending data for multiple agencies and fiscal years."""
     from config import AWARDS_FISCAL_YEARS
@@ -205,7 +221,9 @@ def fetch_usaspending_all(
         frames = []
         for fy in years:
             print(f"USASpending: {key} FY{fy}")
-            df = fetch_usaspending_awards(key, fy, force=force)
+            df = fetch_usaspending_awards(
+                key, fy, force=force, date_type=date_type, cache_dir=cache_dir,
+            )
             if not df.empty:
                 frames.append(df)
         if frames:
@@ -216,6 +234,8 @@ def fetch_usaspending_all(
 def fetch_all_freshness(
     agency_keys: list[str] | None = None,
     force: bool = False,
+    date_type: str = "new_awards_only",
+    cache_dir: Path | None = None,
 ) -> dict[str, str]:
     """Fetch freshness (max last_modified_date) for all USASpending agencies."""
     if agency_keys is None:
@@ -225,7 +245,9 @@ def fetch_all_freshness(
 
     freshness = {}
     for key in agency_keys:
-        result = fetch_usaspending_freshness(key, CURRENT_FY, force=force)
+        result = fetch_usaspending_freshness(
+            key, CURRENT_FY, force=force, date_type=date_type, cache_dir=cache_dir,
+        )
         if result:
             freshness[key] = result
     return freshness

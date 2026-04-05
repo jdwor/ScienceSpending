@@ -180,26 +180,36 @@
         const parts = [];
 
         if (cfg.latest_period_label) {
-            parts.push('Obligations through ' + cfg.latest_period_label + ' ' + cfg.current_fy);
+            // Obligations run through the end of the last complete month
+            var obligLabel = cfg.latest_period_label.split(' ')[0]; // strip "(Q1)" etc
+            var monthIdx = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(obligLabel);
+            if (monthIdx >= 0) {
+                // Compute last day of the month using the current FY's calendar year
+                var calYear = monthIdx >= 9 ? cfg.current_fy - 1 : cfg.current_fy;
+                var lastDay = new Date(calYear, monthIdx + 1, 0).getDate();
+                parts.push('Obligations through ' + obligLabel + ' ' + lastDay + ', ' + calYear);
+            }
         }
 
-        // Find latest awards date across all agencies
+        // Find earliest latest_date across all award agencies (the date through which all agencies have data)
         if (DATA.awards_summary) {
-            let latestAwardDate = null;
+            let minAwardDate = null;
             for (const key of Object.keys(DATA.awards_summary)) {
                 const d = DATA.awards_summary[key].latest_date;
-                if (d && (!latestAwardDate || d > latestAwardDate)) latestAwardDate = d;
+                if (d && (!minAwardDate || d < minAwardDate)) minAwardDate = d;
             }
-            if (latestAwardDate) {
-                const dt = new Date(latestAwardDate + 'T00:00:00');
-                const monthName = dt.toLocaleString('en-US', { month: 'short' });
-                const fyMonth = dt.getMonth() >= 9 ? dt.getMonth() - 8 : dt.getMonth() + 4;
-                parts.push('Awards through ' + monthName + ' ' + cfg.current_fy);
+            if (minAwardDate) {
+                var parts2 = minAwardDate.split('-');
+                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                var awardLabel = months[parseInt(parts2[1], 10) - 1] + ' ' + parseInt(parts2[2], 10);
+                parts.push('Awards through ' + awardLabel + ', ' + parts2[0]);
             }
         }
 
         if (cfg.build_date) {
-            parts.push('Updated ' + cfg.build_date);
+            var bd = cfg.build_date.split('-');
+            var bdMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            parts.push('Updated ' + bdMonths[parseInt(bd[1], 10) - 1] + ' ' + parseInt(bd[2], 10) + ', ' + bd[0]);
         }
 
         if (parts.length > 0) {
@@ -220,6 +230,7 @@
         const btns = document.querySelectorAll('.tab-btn');
         const panels = document.querySelectorAll('.tab-panel');
 
+        const renderedTabs = new Set();
         function activateTab(tabName) {
             const btn = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
             if (!btn) return;
@@ -231,11 +242,22 @@
             btn.classList.add('active');
             btn.setAttribute('aria-selected', 'true');
             document.getElementById('tab-' + tabName).classList.add('active');
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+            if (!renderedTabs.has(tabName)) {
+                renderedTabs.add(tabName);
+                // Defer chart rendering until after the tab is visible
+                setTimeout(() => {
+                    if (tabName === 'overview') renderOverviewCards();
+                    if (tabName === 'obligations') renderObligationsTab();
+                    if (tabName === 'awards') initAwardsTab();
+                    if (tabName === 'awards-all') initAllAwardsTab();
+                    if (tabName === 'unified') initUnifiedTab();
+                }, 10);
+            }
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
         }
 
         // Map between URL hashes and internal tab names
-        const tabToHash = { obligations: 'obligations', awards: 'awards', data: 'methods', unified: 'unified' };
+        const tabToHash = { overview: 'overview', obligations: 'obligations', awards: 'awards', 'awards-all': 'all-awards', data: 'methods', unified: 'unified' };
         const hashToTab = {};
         for (const k in tabToHash) hashToTab[tabToHash[k]] = k;
 
@@ -260,10 +282,219 @@
         const select = document.getElementById('data-section-select');
         if (!select) return;
 
+        const sections = ['obligations', 'awards', 'awards-all'];
         select.addEventListener('change', () => {
             const val = select.value;
-            document.getElementById('data-section-obligations').style.display = val === 'obligations' ? '' : 'none';
-            document.getElementById('data-section-awards').style.display = val === 'awards' ? '' : 'none';
+            for (const s of sections) {
+                const el = document.getElementById('data-section-' + s);
+                if (el) el.style.display = val === s ? '' : 'none';
+            }
+        });
+    }
+
+    function renderObligationsTab() {
+        renderMultiAgencyChart();
+        renderSmallMultiples();
+        renderAgencyDetail();
+    }
+
+    function renderOverviewCards() {
+        const container = document.getElementById('overview-cards');
+        if (!container) return;
+        const cfg = DATA.config;
+        const summaries = DATA.summaries || {};
+        const awardsSummary = DATA.awards_summary || {};
+        const allAwardsSummary = DATA.awards_all_summary || {};
+
+        function verdict(obligRel, awardsRel, allAwardsRel) {
+            // Average of all available metrics
+            const vals = [obligRel, awardsRel, allAwardsRel].filter(v => v != null);
+            if (vals.length === 0) return { text: '', cls: '' };
+            const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+            if (avg <= -25) return { text: 'Well below pace', cls: 'verdict-well-below' };
+            if (avg <= -10) return { text: 'Below pace', cls: 'verdict-below' };
+            if (avg >= 25) return { text: 'Well above pace', cls: 'verdict-above' };
+            if (avg >= 10) return { text: 'Above pace', cls: 'verdict-above' };
+            return { text: 'Roughly on pace', cls: 'verdict-near' };
+        }
+
+        function fmtPct(val) {
+            if (val == null) return '\u2014';
+            const sign = val >= 0 ? '+' : '';
+            return sign + val.toFixed(0) + '%';
+        }
+
+        function pctClass(val) {
+            if (val == null) return '';
+            if (val <= -5) return 'metric-neg';
+            if (val >= 5) return 'metric-pos';
+            return '';
+        }
+
+        function relPct(current, benchmark) {
+            if (current == null || benchmark == null || benchmark === 0) return null;
+            return (current / benchmark - 1) * 100;
+        }
+
+        let html = '';
+        // Show agencies that have obligations data (the main 5)
+        for (const key of Object.keys(cfg.agencies)) {
+            const agency = cfg.agencies[key];
+            const oblig = summaries[key];
+            const awards = awardsSummary[key];
+            const allAwards = allAwardsSummary[key];
+
+            // Compute relative % for each measure
+            const obligRel = oblig ? oblig.mean_rel : null;
+            const awardsRel = (awards && awards.cumul_pct_approp != null && awards.mean_pct_approp > 0)
+                ? relPct(awards.cumul_pct_approp, awards.mean_pct_approp) : null;
+            const allAwardsRel = (allAwards && allAwards.cumul_pct_approp != null && allAwards.mean_pct_approp > 0)
+                ? relPct(allAwards.cumul_pct_approp, allAwards.mean_pct_approp) : null;
+
+            const v = verdict(obligRel, awardsRel, allAwardsRel);
+
+            // Build metric items (label + value + chart div)
+            var metrics = [];
+            if (awardsRel != null) {
+                metrics.push({ label: 'New Awards', subtitle: '% of approp awarded vs. historical avg', value: fmtPct(awardsRel), cls: pctClass(awardsRel), chartId: 'overview-chart-awards-' + key });
+            }
+            if (allAwardsRel != null) {
+                metrics.push({ label: 'All Awards', subtitle: '% of approp obligated on grants vs. historical avg', value: fmtPct(allAwardsRel), cls: pctClass(allAwardsRel), chartId: 'overview-chart-all-' + key });
+            }
+            if (obligRel != null) {
+                metrics.push({ label: 'Obligations', subtitle: '% of approp obligated vs. historical avg', value: fmtPct(obligRel), cls: pctClass(obligRel), chartId: 'overview-chart-oblig-' + key });
+            }
+
+            html += '<div class="overview-card" data-agency="' + key + '" style="border-top-color: ' + agency.color + ';">';
+            html += '<div class="overview-card-header">';
+            html += '<div class="overview-card-name">' + agency.display_name + '<span class="overview-chevron">&#x25BE;</span></div>';
+
+            // Collapsed metrics (hidden when expanded)
+            html += '<div class="overview-card-metrics overview-card-collapsed-only">';
+            for (var mi = 0; mi < metrics.length; mi++) {
+                html += '<span class="metric-row-label">' + metrics[mi].label + '</span>';
+                html += '<span class="metric-row-value ' + metrics[mi].cls + '">' + metrics[mi].value + '</span>';
+            }
+            html += '</div>';
+
+            // Verdict below metrics
+            html += '<div class="overview-card-verdict overview-card-collapsed-only ' + v.cls + '">' + v.text + ' <span class="verdict-context">relative to typical rates in past years</span></div>';
+
+            html += '</div>'; // close header
+
+            // Expandable chart area
+            html += '<div class="overview-card-expand"><div class="overview-card-expand-inner">';
+            html += '<div class="overview-card-charts">';
+            for (var mi = 0; mi < metrics.length; mi++) {
+                html += '<div class="overview-chart-slot">';
+                html += '<div class="chart-slot-header">';
+                html += '<span class="chart-slot-label">' + metrics[mi].label + ': <span class="chart-slot-value ' + metrics[mi].cls + '">' + metrics[mi].value + '</span></span>';
+                html += '<span class="chart-slot-subtitle">' + metrics[mi].subtitle + '</span>';
+                html += '</div>';
+                html += '<div id="' + metrics[mi].chartId + '"></div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            // Shared legend below charts
+            html += '<div class="overview-shared-legend">';
+            html += '<span class="legend-item"><span class="legend-swatch legend-band"></span>Historical range</span>';
+            html += '<span class="legend-item"><span class="legend-swatch legend-avg"></span>Historical avg.</span>';
+            var hlYears = (cfg.highlight_years || []).sort();
+            for (var hi = 0; hi < hlYears.length; hi++) {
+                if (hlYears[hi] !== cfg.current_fy) {
+                    html += '<span class="legend-item"><span class="legend-line" style="background:' + (HIGHLIGHT_COLORS[hlYears[hi]] || '#94a3b8') + '"></span>FY ' + hlYears[hi] + '</span>';
+                }
+            }
+            html += '<span class="legend-item"><span class="legend-line" style="border-top-color:' + agency.color + ';border-top-width:2.5px"></span>FY ' + cfg.current_fy + '</span>';
+            html += '</div>';
+            html += '</div></div>';
+
+            html += '</div>'; // close card
+        }
+
+        container.innerHTML = html;
+
+        // Click handling
+        const expandedCharts = new Set();
+        const allCards = Array.from(container.querySelectorAll('.overview-card'));
+
+        function getRowStart(card) {
+            // Find which row this card is on by checking its top offset
+            const rect = card.getBoundingClientRect();
+            return Math.round(rect.top);
+        }
+
+        function setRowOrder(expandedCard) {
+            // Reset all orders
+            allCards.forEach(c => c.style.order = '');
+            if (!expandedCard) return;
+
+            // Find cards on the same row as the expanded card (before expansion)
+            // Use the card's index to determine row: with auto-fit columns,
+            // we read the computed grid to find columns per row
+            const style = getComputedStyle(container);
+            const cols = style.gridTemplateColumns.split(' ').length;
+            const idx = allCards.indexOf(expandedCard);
+            const rowStart = Math.floor(idx / cols) * cols;
+
+            // Set order so expanded card comes first in its row
+            for (let i = 0; i < allCards.length; i++) {
+                if (i === idx) {
+                    allCards[i].style.order = String(rowStart);
+                } else if (i >= rowStart && i < rowStart + cols) {
+                    // Same row — push after expanded
+                    allCards[i].style.order = String(rowStart + 1 + (i - rowStart));
+                } else {
+                    allCards[i].style.order = String(i < rowStart ? i : i + 1);
+                }
+            }
+        }
+
+        function suppressLegendsAndTitles(card) {
+            card.querySelectorAll('.js-plotly-plot').forEach(el => {
+                Plotly.relayout(el, { showlegend: false, 'title.text': '', 'margin.t': 10 });
+            });
+        }
+
+        allCards.forEach(card => {
+            card.querySelector('.overview-card-header').addEventListener('click', () => {
+                const agencyKey = card.dataset.agency;
+                const wasExpanded = card.classList.contains('expanded');
+
+                // Collapse all cards
+                container.querySelectorAll('.overview-card.expanded').forEach(c => {
+                    c.classList.remove('expanded');
+                });
+                setRowOrder(null);
+
+                if (!wasExpanded) {
+                    setRowOrder(card);
+                    card.classList.add('expanded');
+
+                    if (!expandedCharts.has(agencyKey)) {
+                        expandedCharts.add(agencyKey);
+                        setTimeout(() => {
+                            if (DATA.awards && DATA.awards[agencyKey]) {
+                                renderAwardsCumulativeChart(agencyKey, 'overview-chart-awards-' + agencyKey, 'pct', true);
+                            }
+                            if (DATA.awards_all && DATA.awards_all[agencyKey]) {
+                                renderAwardsCumulativeChart(agencyKey, 'overview-chart-all-' + agencyKey, 'pct', true, DATA.awards_all);
+                            }
+                            if (DATA.spenddown && DATA.spenddown[agencyKey]) {
+                                renderSpenddownChart(agencyKey, 'overview-chart-oblig-' + agencyKey, true, true);
+                            }
+                            // Hide per-chart legends (shared legend is in HTML)
+                            setTimeout(() => suppressLegendsAndTitles(card), 100);
+                        }, 50);
+                    } else {
+                        setTimeout(() => {
+                            card.querySelectorAll('.js-plotly-plot').forEach(el => {
+                                Plotly.Plots.resize(el);
+                            });
+                        }, 50);
+                    }
+                }
+            });
         });
     }
 
@@ -419,7 +650,7 @@
             }
 
             if (validIdx.length > 0) {
-                const vm = validIdx.map(i => months[i]);
+                const vm = validIdx.map(i => compact ? obligMonthToRefDate(months[i]) : months[i]);
                 const vlo = validIdx.map(i => minV[i]);
                 const vhi = validIdx.map(i => maxV[i]);
                 const vmd = validIdx.map(i => medV[i]);
@@ -462,12 +693,13 @@
             if (!yearData) continue;
 
             const yVals = showPct ? yearData.pct : yearData.dollars_b;
+            const xVals = compact ? yearData.months.map(obligMonthToRefDate) : yearData.months;
             const color = HIGHLIGHT_COLORS[fy] || '#94a3b8';
             const suffix = showPct ? '% obligated' : 'B';
             const prefix = showPct ? '' : '$';
 
             traces.push({
-                x: yearData.months,
+                x: xVals,
                 y: yVals,
                 mode: 'lines',
                 name: `FY ${fy}`,
@@ -480,10 +712,11 @@
         const currentData = agencyData.years[String(currentFy)];
         if (currentData) {
             const yVals = showPct ? currentData.pct : currentData.dollars_b;
+            const xVals = compact ? currentData.months.map(obligMonthToRefDate) : currentData.months;
             const suffix = showPct ? '% obligated' : 'B';
             const prefix = showPct ? '' : '$';
             traces.push({
-                x: currentData.months,
+                x: xVals,
                 y: yVals,
                 mode: 'lines+markers',
                 name: `FY ${currentFy}`,
@@ -501,7 +734,7 @@
                 if (v != null && v > yMax) yMax = v;
             }
         }
-        const yBuffer = Math.max(yMax * 0.03, 0.1);
+        const yBuffer = Math.max(yMax * 0.03, 0.01);
 
         const height = compact ? 310 : (isMobile() ? 340 : 500);
         const yAxisLabel = showPct ? '% of Appropriation Obligated' : 'Cumulative Obligations ($B)';
@@ -514,7 +747,7 @@
             : agency.display_name + ' \u2014 Obligation Spend-Down'
             + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
         const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")].filter(Boolean);
-        annotations.push(...obligationMonthLabels(compact));
+        if (!compact) annotations.push(...obligationMonthLabels(false));
 
         const layout = {
             title: compact ? {
@@ -528,7 +761,18 @@
                 x: 0.01,
                 xanchor: 'left',
             },
-            xaxis: Object.assign({}, baseAxisStyle(), {
+            xaxis: compact
+            ? Object.assign({}, baseAxisStyle(), {
+                type: 'date',
+                dtick: 'M1',
+                tickformat: '%b',
+                ticklabelmode: 'period',
+                hoverformat: '%b',
+                range: ['2000-09-25', '2001-10-05'],
+                showgrid: true,
+                tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
+            })
+            : Object.assign({}, baseAxisStyle(), {
                 tickvals: ticks.vals,
                 ticktext: ticks.texts,
                 tickfont: { size: 0.1, color: 'rgba(0,0,0,0)' },
@@ -540,7 +784,7 @@
                 ticksuffix: showPct ? '%' : 'B',
                 tickprefix: showPct ? '' : '$',
                 tick0: 0,
-                range: [-yBuffer, null],
+                range: [-yMax * 0.04, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
                 title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
@@ -589,7 +833,7 @@
             : `FY${priorFys[0]}`;
 
         const heading = document.getElementById('overview-agency-heading');
-        heading.textContent = `Individual Agency Obligation Trends`;
+        heading.textContent = 'Individual Agency Trends \u2014 Obligations';
 
         for (const key of Object.keys(cfg.agencies)) {
             if (!DATA.spenddown[key]) continue;
@@ -802,9 +1046,9 @@
             { key: 'agency', label: 'Agency', format: v => cfg.agencies[v] ? cfg.agencies[v].display_name : v },
             { key: 'fy', label: 'FY', format: v => v, cls: 'number' },
             { key: 'month', label: 'Month', format: v => labels[v] || v },
-            { key: 'obligations', label: 'Obligations ($)', format: v => v != null ? formatDollars(v * 1e9) : '\u2014', cls: 'number' },
-            { key: 'appropriations', label: 'Appropriation ($)', format: v => v != null ? formatDollars(v * 1e9) : '\u2014', cls: 'number' },
-            { key: 'pct', label: '% Obligated', format: v => v != null ? v.toFixed(1) + '%' : '\u2014', cls: 'number' },
+            { key: 'obligations', label: 'Obligations ($)', format: v => v != null ? Math.round(v * 1e9) : '\u2014', cls: 'number' },
+            { key: 'appropriations', label: 'Appropriation ($)', format: v => v != null ? Math.round(v * 1e9) : '\u2014', cls: 'number' },
+            { key: 'pct', label: '% Obligated', format: v => v != null ? v.toFixed(4) : '\u2014', cls: 'number' },
         ];
 
         thead.innerHTML = '<tr>' + cols.map(c => '<th>' + c.label + '</th>').join('') + '</tr>';
@@ -863,9 +1107,9 @@
             { key: 'fiscal_year', label: 'FY', format: function(v) { return v; }, cls: 'number' },
             { key: 'date', label: 'Date', format: function(v) { return v; } },
             { key: 'fy_day', label: 'FY Day', format: function(v) { return v; }, cls: 'number' },
-            { key: 'count', label: 'Cumul. Awards', format: function(v) { return v != null && v > 0 ? v.toLocaleString() : '\u2014'; }, cls: 'number' },
-            { key: 'dollars_m', label: 'Cumul. Dollars ($M)', format: function(v) { return v != null ? '$' + v.toFixed(1) + 'M' : '\u2014'; }, cls: 'number' },
-            { key: 'pct_approp', label: '% of Approp', format: function(v) { return v != null ? v.toFixed(2) + '%' : '\u2014'; }, cls: 'number' },
+            { key: 'count', label: 'Cumul. Awards', format: function(v) { return v != null && v > 0 ? v : '\u2014'; }, cls: 'number' },
+            { key: 'dollars', label: 'Cumul. Dollars ($)', format: function(v) { return v != null ? Math.round(v) : '\u2014'; }, cls: 'number' },
+            { key: 'pct_approp', label: '% of Approp', format: function(v) { return v != null ? v.toFixed(4) : '\u2014'; }, cls: 'number' },
         ];
 
         thead.innerHTML = '<tr>' + cols.map(function(c) { return '<th>' + c.label + '</th>'; }).join('') + '</tr>';
@@ -898,7 +1142,7 @@
                             date: yearData.dates[idx],
                             fy_day: yearData.fy_days[idx],
                             count: yearData.cumulative_count ? yearData.cumulative_count[idx] : null,
-                            dollars_m: yearData.cumulative_dollars_m[idx],
+                            dollars: yearData.cumulative_dollars_m[idx] != null ? yearData.cumulative_dollars_m[idx] * 1e6 : null,
                             pct_approp: yearData.pct_of_approp ? yearData.pct_of_approp[idx] : null,
                         });
                     }
@@ -912,10 +1156,71 @@
                             date: yearData.dates[i],
                             fy_day: yearData.fy_days[i],
                             count: yearData.cumulative_count ? yearData.cumulative_count[i] : null,
-                            dollars_m: yearData.cumulative_dollars_m[i],
+                            dollars: yearData.cumulative_dollars_m[i] != null ? yearData.cumulative_dollars_m[i] * 1e6 : null,
                             pct_approp: yearData.pct_of_approp ? yearData.pct_of_approp[i] : null,
                         });
                     }
+                }
+            }
+        }
+
+        rows.sort(function(a, b) {
+            var cmp = (a.agency || '').localeCompare(b.agency || '');
+            if (cmp !== 0) return cmp;
+            cmp = a.fiscal_year - b.fiscal_year;
+            if (cmp !== 0) return cmp;
+            return a.fy_day - b.fy_day;
+        });
+
+        tbody.innerHTML = rows.map(function(row) {
+            return '<tr>' + cols.map(function(c) {
+                var val = row[c.key];
+                var formatted = c.format(val);
+                return '<td class="' + (c.cls || '') + '">' + formatted + '</td>';
+            }).join('') + '</tr>';
+        }).join('');
+    }
+
+    function renderAllAwardsSeriesTable() {
+        const awards = DATA.awards_all;
+        const cfg = DATA.config;
+        const table = document.getElementById('table-awards-all-series');
+        if (!table || !awards) return;
+
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+
+        const cols = [
+            { key: 'agency', label: 'Agency', format: function(v) { var a = cfg.agencies[v]; return a ? a.display_name : v; } },
+            { key: 'fiscal_year', label: 'FY', format: function(v) { return v; }, cls: 'number' },
+            { key: 'date', label: 'Date', format: function(v) { return v; } },
+            { key: 'fy_day', label: 'FY Day', format: function(v) { return v; }, cls: 'number' },
+            { key: 'dollars', label: 'Cumul. Dollars ($)', format: function(v) { return v != null ? Math.round(v) : '\u2014'; }, cls: 'number' },
+            { key: 'pct_approp', label: '% of Approp', format: function(v) { return v != null ? v.toFixed(4) : '\u2014'; }, cls: 'number' },
+        ];
+
+        thead.innerHTML = '<tr>' + cols.map(function(c) { return '<th>' + c.label + '</th>'; }).join('') + '</tr>';
+
+        var rows = [];
+        for (var agencyKey in awards) {
+            if (!cfg.agencies[agencyKey]) continue;
+            var agencyData = awards[agencyKey];
+
+            for (var fi = 0; fi < agencyData.fiscal_years.length; fi++) {
+                var fy = agencyData.fiscal_years[fi];
+                var yearData = agencyData.years[String(fy)];
+                if (!yearData) continue;
+
+                for (var i = 0; i < yearData.fy_days.length; i++) {
+                    if (yearData.fy_days[i] === 1 && yearData.cumulative_dollars_m[i] === 0) continue;
+                    rows.push({
+                        agency: agencyKey,
+                        fiscal_year: fy,
+                        date: yearData.dates[i],
+                        fy_day: yearData.fy_days[i],
+                        dollars: yearData.cumulative_dollars_m[i] != null ? yearData.cumulative_dollars_m[i] * 1e6 : null,
+                        pct_approp: yearData.pct_of_approp ? yearData.pct_of_approp[i] : null,
+                    });
                 }
             }
         }
@@ -977,6 +1282,13 @@
     if (awardsTableBtn) {
         awardsTableBtn.addEventListener('click', function() {
             downloadTableCSV('table-awards-series', 'award_series.csv');
+        });
+    }
+
+    var awardsAllTableBtn = document.getElementById('btn-awards-all-table-csv');
+    if (awardsAllTableBtn) {
+        awardsAllTableBtn.addEventListener('click', function() {
+            downloadTableCSV('table-awards-all-series', 'award_series_all.csv');
         });
     }
 
@@ -1046,10 +1358,23 @@
         return d.toISOString().slice(0, 10);
     }
 
+    // Map obligation month index (1=Oct...12=Sep) to a reference date at
+    // the end of the month, so dots sit at the right edge of the labeled
+    // month period — matching the original obligations chart positioning
+    // where dots represent cumulative values as of end-of-month.
+    function obligMonthToRefDate(m) {
+        // Month 1=Oct, 2=Nov, ..., 12=Sep. Map to calendar month in 2000-2001.
+        var calMonth = ((m - 1 + 9) % 12); // 0-indexed calendar month (0=Jan)
+        var calYear = calMonth >= 9 ? 2000 : 2001;
+        // Last day of the month
+        var lastDay = new Date(calYear, calMonth + 1, 0).getDate();
+        return calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
+    }
+
     // ── Awards: Multi-Agency Pace Chart ──
 
-    function renderAwardsMultiChart() {
-        const awards = DATA.awards;
+    function renderAwardsMultiChart(overrideAwards, overrideTarget, overrideTitleEl) {
+        const awards = overrideAwards || DATA.awards;
         const cfg = DATA.config;
         if (!awards) return;
 
@@ -1111,7 +1436,7 @@
                 if (closestMean == null || closestMean < 0.05) continue;
 
                 xVals.push(day);
-                yVals.push(Math.round((currVal / closestMean * 100 - 100) * 100) / 100);
+                yVals.push(Math.max(-100, Math.round((currVal / closestMean * 100 - 100) * 100) / 100));
             }
 
             if (xVals.length === 0) continue;
@@ -1213,9 +1538,10 @@
         }
 
         // Set HTML chart title
-        const awardsTitleEl = document.getElementById('awards-multi-title');
+        const awardsTitleEl = overrideTitleEl ? document.getElementById(overrideTitleEl) : document.getElementById('awards-multi-title');
         if (awardsTitleEl) {
-            awardsTitleEl.textContent = `FY${currentFy} Award-Making Pace vs. Historical Average`;
+            const isAllAwards = overrideAwards === DATA.awards_all;
+            awardsTitleEl.textContent = `FY${currentFy} ${isAllAwards ? '' : 'New '}Award-Making Pace vs. Historical Average`;
         }
 
         const layout = {
@@ -1267,14 +1593,14 @@
             ].filter(Boolean),
         };
 
-        Plotly.newPlot('chart-awards-multi', traces, layout, plotlyConfigCompact());
+        Plotly.newPlot(overrideTarget || 'chart-awards-multi', traces, layout, plotlyConfigCompact());
     }
 
     // ── Awards: Cumulative Chart (Single Agency) ──
     // mode: 'pct' (% of appropriation), 'dollars', or 'counts'
 
-    function renderAwardsCumulativeChart(agencyKey, targetDiv, mode, compact) {
-        const awards = DATA.awards;
+    function renderAwardsCumulativeChart(agencyKey, targetDiv, mode, compact, overrideAwards) {
+        const awards = overrideAwards || DATA.awards;
         const cfg = DATA.config;
         if (!awards || !awards[agencyKey]) return;
 
@@ -1295,13 +1621,14 @@
                        : agencyAwards.envelope_pct;
         const isPct = mode === 'pct';
         const isDollars = mode === 'dollars';
+        const floor0 = arr => arr ? arr.map(v => v != null ? Math.max(0, v) : v) : arr;
 
         // Envelope band
         if (envelope) {
             const days = envelope.fy_days.map(fyDayToRefDate);
-            const minV = envelope.min;
-            const maxV = envelope.max;
-            const medV = envelope.mean;
+            const minV = floor0(envelope.min);
+            const maxV = floor0(envelope.max);
+            const medV = floor0(envelope.mean);
             const bandFys = envelope.band_fys;
 
             const validIdx = [];
@@ -1363,7 +1690,7 @@
             const color = HIGHLIGHT_COLORS[fy] || '#94a3b8';
             traces.push({
                 x: yearData.fy_days.map(fyDayToRefDate),
-                y: yearData[yCol],
+                y: floor0(yearData[yCol]),
                 mode: 'lines',
                 name: `FY ${fy}`,
                 line: { color: color, width: 1.8 },
@@ -1376,7 +1703,7 @@
         if (currentData) {
             const provIdx = currentData.provisional_index;
             const allX = currentData.fy_days.map(fyDayToRefDate);
-            const allY = currentData[yCol];
+            const allY = floor0(currentData[yCol]);
 
             if (provIdx != null && provIdx > 0) {
                 // Split into complete portion (with markers) and provisional tail (line only)
@@ -1426,15 +1753,17 @@
         const sourceLabel = SOURCE_LABELS[agencyAwards.source_type] || agencyAwards.source_type;
         const awardAnnotations = compact ? [] : [sourceAnnotation('Source: ' + sourceLabel)].filter(Boolean);
 
+        const isAllAwardsChart = !!overrideAwards;
         const awardYLabel = isPct ? '% of Appropriation Awarded' : isDollars ? 'Cumulative Awards ($M)' : 'Cumulative Award Count';
+        const awardTypeLabel = isAllAwardsChart ? 'grant obligation' : 'new award';
         const awardsDetailSubtitle = mode === 'counts'
-            ? 'Cumulative new award count over the fiscal year.'
-            : isDollars ? 'Cumulative new award dollars over the fiscal year.'
+            ? 'Cumulative ' + awardTypeLabel + ' count over the fiscal year.'
+            : isDollars ? 'Cumulative ' + awardTypeLabel + ' dollars over the fiscal year.'
             : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
         const mobileAwd = isMobile();
         const awardsDetailTitle = mobileAwd
             ? agencyCfg.display_name + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
-            : agencyCfg.display_name + ' \u2014 New Awards'
+            : agencyCfg.display_name + ' \u2014 ' + (overrideAwards ? 'All Awards' : 'New Awards')
             + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
 
         const layout = {
@@ -1462,7 +1791,8 @@
             yaxis: Object.assign({}, baseAxisStyle(), {
                 ticksuffix: isPct ? '%' : isDollars ? 'M' : '',
                 tickprefix: isDollars ? '$' : '',
-                range: [-yBufferAward, null],
+                tick0: 0,
+                range: [-yMaxAward * 0.04, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
                 title: compact ? undefined : { text: awardYLabel, font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
@@ -1522,10 +1852,10 @@
 
     // ── Awards: Metric Cards ──
 
-    function renderAwardsMetrics(agencyKey) {
-        const container = document.getElementById('awards-metrics');
-        const awards = DATA.awards;
-        const summary = DATA.awards_summary;
+    function renderAwardsMetrics(agencyKey, overrideContainerId, overrideAwards, overrideSummary) {
+        const container = document.getElementById(overrideContainerId || 'awards-metrics');
+        const awards = overrideAwards || DATA.awards;
+        const summary = overrideSummary || DATA.awards_summary;
         const cfg = DATA.config;
 
         if (!awards || !awards[agencyKey]) {
@@ -1582,7 +1912,7 @@
                 current: formatDollars(summ.cumul_dollars),
                 avg: summ.mean_dollars != null ? formatDollars(summ.mean_dollars) : 'N/A',
                 vs: r,
-                vsSup: '‡',
+                vsSup: '†',
             });
         }
 
@@ -1615,7 +1945,7 @@
         html += '</tbody></table>';
         html += '<div class="summary-table-footnotes">';
         if (hasCounts) html += '<p><sup>†</sup> Affected by changes in prevalence of multi-year funding</p>';
-        html += '<p><sup>‡</sup> Affected by changes in annual appropriations</p>';
+        html += '<p><sup>†</sup> Affected by changes in annual appropriations</p>';
         html += '</div>';
         container.innerHTML = html;
     }
@@ -1998,7 +2328,7 @@
             }),
             yaxis: Object.assign({}, baseAxisStyle(), {
                 ticksuffix: isPct ? '%' : 'M', tickprefix: isDollars ? '$' : '',
-                range: [-yBuf, null],
+                tick0: 0, range: [-yMaxU * 0.04, null],
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
                 title: compact ? undefined : { text: yAxisLabel, font: { family: FONT_SANS, size: 11, color: MUTED_COLOR }, standoff: 5 },
             }),
@@ -2061,6 +2391,112 @@
         if (cards[3] && medDir) cards[3].querySelector('.metric-value').classList.add(medDir === 'negative' ? 'metric-neg' : 'metric-pos');
     }
 
+    // ── All Awards Tab ──
+
+    function initAllAwardsTab() {
+        var awards = DATA.awards_all;
+        if (!awards) return;
+
+        // Show the tab button
+        var btn = document.getElementById('tab-btn-awards-all');
+        if (btn) btn.style.display = '';
+
+        // Set multi-agency chart title
+        var titleEl = document.getElementById('awards-all-multi-title');
+        if (titleEl) titleEl.textContent = 'FY' + DATA.config.current_fy + ' Award-Making Pace vs. Historical Average';
+
+        // Populate agency select
+        var select = document.getElementById('awards-all-agency-select');
+        if (!select) return;
+        select.innerHTML = '';
+        for (var key of Object.keys(awards)) {
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = DATA.config.agencies[key].display_name;
+            select.appendChild(opt);
+        }
+
+        select.addEventListener('change', renderAllAwardsDetail);
+        initSegmentedControl('awards-all-view-mode', renderAllAwardsDetail);
+
+        // Export
+        var pngBtn = document.getElementById('btn-awards-all-download-png');
+        var csvBtn = document.getElementById('btn-awards-all-download-csv');
+        if (pngBtn) pngBtn.addEventListener('click', function() {
+            exportChartAsPng('chart-awards-all-detail', select.value + '_all_awards');
+        });
+        if (csvBtn) csvBtn.addEventListener('click', function() {
+            var agencyKey = select.value;
+            exportAllAwardsCsv(agencyKey);
+        });
+
+        renderAllAwardsMultiChart();
+        renderAllAwardsSmallMultiples();
+        renderAllAwardsDetail();
+    }
+
+    function renderAllAwardsMultiChart() {
+        renderAwardsMultiChart(DATA.awards_all, 'chart-awards-all-multi', 'awards-all-multi-title');
+    }
+
+    function renderAllAwardsSmallMultiples() {
+        var awards = DATA.awards_all;
+        if (!awards) return;
+        var container = document.getElementById('awards-all-small-multiples');
+        container.innerHTML = '';
+        for (var key of Object.keys(awards)) {
+            var div = document.createElement('div');
+            div.className = 'chart-card';
+            div.innerHTML = '<div id="chart-awards-all-mini-' + key + '"></div>';
+            container.appendChild(div);
+            renderAwardsCumulativeChart(key, 'chart-awards-all-mini-' + key, 'pct', true, DATA.awards_all);
+        }
+    }
+
+    function renderAllAwardsDetail() {
+        var awards = DATA.awards_all;
+        if (!awards) return;
+
+        var select = document.getElementById('awards-all-agency-select');
+        var agencyKey = select.value;
+        var agencyAwards = awards[agencyKey];
+
+        var hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';
+        var mode = getActiveMode('awards-all-view-mode');
+
+        var countsBtn = document.querySelector('#awards-all-view-mode .seg-btn[data-mode="counts"]');
+        if (countsBtn) {
+            countsBtn.disabled = !hasCounts;
+            countsBtn.style.display = hasCounts ? '' : 'none';
+        }
+
+        var effectiveMode = (mode === 'counts' && !hasCounts) ? 'pct' : mode;
+
+        renderAwardsMetrics(agencyKey, 'awards-all-metrics', DATA.awards_all, DATA.awards_all_summary);
+        renderAwardsCumulativeChart(agencyKey, 'chart-awards-all-detail', effectiveMode, false, DATA.awards_all);
+    }
+
+    function exportAllAwardsCsv(agencyKey) {
+        var awards = DATA.awards_all;
+        if (!awards || !awards[agencyKey]) return;
+        var agencyAwards = awards[agencyKey];
+        var cfg = DATA.config;
+        var rows = ['fiscal_year,fy_day,cumulative_count,cumulative_dollars_m'];
+        for (var fyStr in agencyAwards.years) {
+            var fy = agencyAwards.years[fyStr];
+            for (var i = 0; i < fy.fy_days.length; i++) {
+                var count = fy.cumulative_count ? fy.cumulative_count[i] : '';
+                var dollars = fy.cumulative_dollars_m ? fy.cumulative_dollars_m[i] : '';
+                rows.push(fyStr + ',' + fy.fy_days[i] + ',' + count + ',' + dollars);
+            }
+        }
+        var blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = agencyKey.toLowerCase() + '_all_awards.csv';
+        a.click();
+    }
+
     // ── Initialize ──
 
     async function init() {
@@ -2079,13 +2515,17 @@
         initExport();
         initAwardsExport();
         renderDataBadge();
-        renderMultiAgencyChart();
-        renderSmallMultiples();
-        renderAgencyDetail();
         renderTables();
         renderAwardsSeriesTable();
-        initAwardsTab();
-        initUnifiedTab();
+        renderAllAwardsSeriesTable();
+        // Show tab buttons for tabs that have data
+        if (DATA.awards_all) {
+            var aab = document.getElementById('tab-btn-awards-all');
+            if (aab) aab.style.display = '';
+        }
+        // Overview cards render eagerly (default tab, no Plotly charts)
+        renderOverviewCards();
+        // All chart rendering is deferred to activateTab() so Plotly gets correct dimensions
     }
 
     if (document.readyState === 'loading') {

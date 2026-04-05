@@ -211,3 +211,154 @@ def fetch_nsf_all(
         if not df.empty:
             frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _parse_funds_obligated_entry(entry: str) -> tuple[int | None, int]:
+    """Parse 'FY 2024 = $29,000.00' into (fiscal_year, amount)."""
+    try:
+        parts = entry.split("=")
+        fy_str = parts[0].strip().replace("FY ", "")
+        fy = int(fy_str)
+        amt = int(float(parts[1].strip().replace("$", "").replace(",", "")))
+        return fy, amt
+    except (ValueError, IndexError):
+        return None, 0
+
+
+def _extract_records_all_years(
+    awards: list[dict], target_fys: set[int], decision_fy: int,
+) -> list[dict]:
+    """Extract records for every FY with funds obligated, plus the decision-date FY.
+
+    Two sources of records per award:
+    1. The decision-date FY gets a record using the first fundsObligated entry
+       (same logic as the new-awards pipeline — see CLAUDE.md on why FY-matching
+       fails for ~7% of awards).
+    2. Every OTHER target FY that appears in the fundsObligated array gets a
+       record using that entry's dollar amount, dated to March 1 of that FY
+       (approximation — exact obligation date isn't available).
+    """
+    records = []
+    for a in awards:
+        cfda = a.get("cfdaNumber", "")
+        award_cfdas = [c.strip() for c in cfda.split(",")]
+        if not any(c in NSF_AWARD_CFDAS for c in award_cfdas):
+            continue
+
+        fo_list = a.get("fundsObligated", [])
+        award_id = a.get("id", "")
+        decision_date = a.get("date", "")
+
+        # Parse decision date
+        date_str = ""
+        if decision_date:
+            try:
+                dt = datetime.strptime(decision_date, "%m/%d/%Y")
+                date_str = dt.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+
+        emitted_fys = set()
+
+        # Record 1: decision-date FY gets first fundsObligated entry (unconditional)
+        if decision_fy in target_fys and fo_list:
+            amt = 0
+            try:
+                parts = fo_list[0].split("=")
+                amt = int(float(parts[1].strip().replace("$", "").replace(",", "")))
+            except (ValueError, IndexError):
+                pass
+            records.append({
+                "fiscal_year": decision_fy,
+                "date": date_str,
+                "agency": "NSF",
+                "award_id": award_id,
+                "award_amount": amt,
+                "cfda_number": cfda,
+            })
+            emitted_fys.add(decision_fy)
+
+        # Record 2+: other FYs from fundsObligated entries
+        # Date these by adding yearly increments to the decision date,
+        # so continuing awards land at the same calendar position each year.
+        for entry in fo_list:
+            fy, amt = _parse_funds_obligated_entry(entry)
+            if fy is None or fy not in target_fys or fy in emitted_fys:
+                continue
+            offset_date = ""
+            if decision_date and date_str:
+                try:
+                    dt = datetime.strptime(decision_date, "%m/%d/%Y")
+                    year_diff = fy - decision_fy
+                    offset_dt = dt.replace(year=dt.year + year_diff)
+                    offset_date = offset_dt.strftime("%Y-%m-%d")
+                except (ValueError, OverflowError):
+                    offset_date = f"{fy}-03-01"
+            else:
+                offset_date = f"{fy}-03-01"
+            records.append({
+                "fiscal_year": fy,
+                "date": offset_date,
+                "agency": "NSF",
+                "award_id": award_id,
+                "award_amount": amt,
+                "cfda_number": cfda,
+            })
+            emitted_fys.add(fy)
+
+    return records
+
+
+def fetch_nsf_all_awards(
+    fiscal_year: int,
+    target_fys: set[int],
+    force: bool = False,
+) -> list[dict]:
+    """Fetch NSF awards for one decision-date FY and extract records for all target FYs.
+
+    Reuses the same cache as the new-awards pipeline.
+    """
+    all_records = []
+    for cal_year, cal_month in _fy_months(fiscal_year):
+        cache_file = _cache_path(fiscal_year, cal_year, cal_month)
+        if not force and _cache_is_fresh(cache_file, fiscal_year):
+            with open(cache_file) as f:
+                awards = json.load(f)
+        else:
+            month_name = calendar.month_abbr[cal_month]
+            print(f"  Fetching NSF FY{fiscal_year} / {month_name} {cal_year}...")
+            awards = _fetch_month(cal_year, cal_month)
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_file, "w") as f:
+                json.dump(awards, f)
+        all_records.extend(_extract_records_all_years(awards, target_fys, decision_fy=fiscal_year))
+    return all_records
+
+
+def fetch_nsf_all_fys_all_awards(
+    fiscal_years: list[int] | None = None, force: bool = False,
+) -> pd.DataFrame:
+    """Fetch NSF awards for all FYs, extracting funds-obligated records across years.
+
+    For each decision-date FY, scans the fundsObligated array to find obligations
+    in any target FY. This captures continuing awards where funds are obligated
+    in years after the original decision.
+    """
+    from config import AWARDS_FISCAL_YEARS
+
+    years = fiscal_years or AWARDS_FISCAL_YEARS
+    target_fys = set(years)
+    all_records = []
+
+    for fy in years:
+        print(f"NSF Awards (all obligations): FY{fy}")
+        records = fetch_nsf_all_awards(fy, target_fys=target_fys, force=force)
+        all_records.extend(records)
+
+    if not all_records:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(all_records)
+    # Deduplicate: same award_id + fiscal_year should appear only once
+    df = df.drop_duplicates(subset=["award_id", "fiscal_year"], keep="first")
+    return df

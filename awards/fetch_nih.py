@@ -62,14 +62,18 @@ def _fetch_page(payload: dict) -> dict:
         NIH_REPORTER_URL,
         json=payload,
         headers={"Content-Type": "application/json"},
-        timeout=60,
+        timeout=120,
     )
     resp.raise_for_status()
     return resp.json()
 
 
-def _fetch_ic(fiscal_year: int, ic: str) -> list[dict]:
-    """Fetch all competing awards for one IC in one FY, paginating."""
+def _fetch_ic(
+    fiscal_year: int, ic: str, award_types: list[str] | None = None,
+) -> list[dict]:
+    """Fetch awards for one IC in one FY, paginating."""
+    if award_types is None:
+        award_types = NIH_COMPETING_TYPES
     all_results = []
     offset = 0
 
@@ -77,7 +81,7 @@ def _fetch_ic(fiscal_year: int, ic: str) -> list[dict]:
         payload = {
             "criteria": {
                 "fiscal_years": [fiscal_year],
-                "award_types": NIH_COMPETING_TYPES,
+                "award_types": award_types,
                 "exclude_subprojects": True,
                 "agencies": [ic],
             },
@@ -124,26 +128,36 @@ def _extract_records(results: list[dict], fiscal_year: int) -> list[dict]:
 
 
 def fetch_nih_awards(
-    fiscal_year: int, force: bool = False
+    fiscal_year: int,
+    force: bool = False,
+    award_types: list[str] | None = None,
+    cache_dir: Path | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch all competing (Type 1+2) NIH awards for a fiscal year.
+    Fetch NIH awards for a fiscal year.
+
+    Parameters:
+        award_types: Award type codes to fetch (default: NIH_COMPETING_TYPES).
+        cache_dir: Override cache directory (for "all awards" pipeline).
 
     Returns DataFrame with columns:
         fiscal_year, date, agency, ic_code, award_type, project_num,
         award_amount, activity_code
     """
+    if award_types is None:
+        award_types = NIH_COMPETING_TYPES
+    cdir = cache_dir or CACHE_DIR
     all_records = []
 
     for ic in NIH_IC_CODES:
-        cache_file = _cache_path(fiscal_year, ic)
+        cache_file = cdir / f"fy{fiscal_year}_{ic}.json"
 
         if not force and _cache_is_fresh(cache_file, fiscal_year):
             with open(cache_file) as f:
                 results = json.load(f)
         else:
             print(f"  Fetching NIH FY{fiscal_year} / {ic}...")
-            results = _fetch_ic(fiscal_year, ic)
+            results = _fetch_ic(fiscal_year, ic, award_types=award_types)
             cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(cache_file, "w") as f:
                 json.dump(results, f)
@@ -161,7 +175,10 @@ def fetch_nih_awards(
 
 
 def fetch_nih_all(
-    fiscal_years: list[int] | None = None, force: bool = False
+    fiscal_years: list[int] | None = None,
+    force: bool = False,
+    award_types: list[str] | None = None,
+    cache_dir: Path | None = None,
 ) -> pd.DataFrame:
     """Fetch NIH awards for multiple fiscal years."""
     from config import AWARDS_FISCAL_YEARS
@@ -170,7 +187,9 @@ def fetch_nih_all(
     frames = []
     for fy in years:
         print(f"NIH Reporter: FY{fy}")
-        df = fetch_nih_awards(fy, force=force)
+        df = fetch_nih_awards(
+            fy, force=force, award_types=award_types, cache_dir=cache_dir,
+        )
         if not df.empty:
             frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()

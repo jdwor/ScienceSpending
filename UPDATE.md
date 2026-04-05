@@ -4,7 +4,9 @@
 
 | Task | Command |
 |------|---------|
-| Awards only | `python3 -m awards.preprocess && python3 build.py` |
+| New awards only | `python3 -m awards.preprocess && python3 build.py` |
+| All awards (new + continuing) | `python3 -m awards.preprocess_all && python3 build.py` |
+| Both awards pipelines | `python3 -m awards.preprocess && python3 -m awards.preprocess_all && python3 build.py` |
 | Check for new obligations data | `python3 data/download.py --check` |
 | Full update (obligations + awards) | See [Step-by-Step Update](#step-by-step-update) |
 | Fiscal year rollover | See [Annual FY Rollover](#annual-fiscal-year-rollover) |

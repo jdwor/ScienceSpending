@@ -82,10 +82,10 @@ AGENCIES = {
         "color": "#d4883a",
     },
     "DOE_SC": {
-        "display_name": "DOE (Office of Science)",
+        "display_name": "DOE (SC + ARPA-E)",
         "sf133_file_key": "doe",
         "filter_type": "tracct",
-        "filter_value": "222",
+        "filter_value": ["222", "337"],
         "color": "#2e8b7a",
     },
     "NASA_SCI": {
@@ -124,6 +124,7 @@ NIH_REPORTER_RATE_LIMIT = 1.0  # seconds between requests
 NIH_REPORTER_PAGE_SIZE = 500
 NIH_REPORTER_MAX_OFFSET = 14999
 NIH_COMPETING_TYPES = ["1", "2"]  # Type 1 (New) + Type 2 (Competing Renewal)
+NIH_ALL_TYPES = ["1", "2", "5"]   # + Type 5 (Non-Competing Continuation)
 
 # NIH IC abbreviations — used to partition queries and stay under API limits
 NIH_IC_CODES = [
@@ -168,7 +169,7 @@ AWARDS_CONFIG = {
         "source": "usaspending",
         "metric_label": "New Grant Awards",
         "metric_label_short": "Awards",
-        "cfda": ["81.049"],
+        "cfda": ["81.049", "81.135"],
         "agency_name": "Department of Energy",
         "agency_tier": "toptier",
     },
@@ -187,5 +188,31 @@ AWARDS_CONFIG = {
         "cfda": ["10.310"],
         "agency_name": "Department of Agriculture",
         "agency_tier": "toptier",
+    },
+}
+
+# "All Awards" config — includes continuations and renewals alongside new awards
+ALL_AWARDS_CONFIG = {
+    "NIH": {
+        "source": "nih_reporter",
+        "metric_label": "All Awards (New + Continuing)",
+        "metric_label_short": "Awards",
+    },
+    "NSF": {
+        "source": "nsf_awards",
+        "metric_label": "All Awards (all directorates)",
+        "metric_label_short": "Awards",
+    },
+    "DOE_SC": {
+        **AWARDS_CONFIG["DOE_SC"],
+        "metric_label": "All Grant Obligations",
+    },
+    "NASA_SCI": {
+        **AWARDS_CONFIG["NASA_SCI"],
+        "metric_label": "All Grant Obligations",
+    },
+    "USDA_RD": {
+        **AWARDS_CONFIG["USDA_RD"],
+        "metric_label": "All Grant Obligations",
     },
 }

@@ -24,8 +24,10 @@
         <!-- Navigation -->
         <nav class="tab-nav" role="tablist" aria-label="Main navigation">
             <div class="container">
-                <button class="tab-btn active" data-tab="obligations" role="tab" aria-selected="true" aria-controls="tab-obligations">Obligations</button>
+                <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="tab-overview">Overview</button>
                 <button class="tab-btn" data-tab="awards" role="tab" aria-selected="false" aria-controls="tab-awards">New Awards</button>
+                <button class="tab-btn" data-tab="awards-all" role="tab" aria-selected="false" aria-controls="tab-awards-all" id="tab-btn-awards-all" style="display:none;">All Awards</button>
+                <button class="tab-btn" data-tab="obligations" role="tab" aria-selected="false" aria-controls="tab-obligations">Obligations</button>
                 <button class="tab-btn" data-tab="data" role="tab" aria-selected="false" aria-controls="tab-data">Data &amp; Methods</button>
                 <button class="tab-btn" data-tab="unified" role="tab" aria-selected="false" aria-controls="tab-unified" id="tab-btn-unified" style="display:none;">USASpending Comparison</button>
             </div>
@@ -33,10 +35,24 @@
 
         <!-- Main Content -->
         <main class="container">
-            <!-- Obligations Tab -->
-            <section id="tab-obligations" class="tab-panel active" role="tabpanel">
+            <!-- Overview Tab -->
+            <section id="tab-overview" class="tab-panel active" role="tabpanel">
                 <div class="intro-text">
-                    <strong>What this tracks.</strong> Obligations are commitments to spend federal funds, and represent the broadest measure of agencies' spending activity. This tab shows total obligations within each agency's research function, including grants, contracts, salaries, and continuations. The data come from OMB's SF 133 Report on Budget Execution, and are normalized to the reported appropriations for the relevant agency functions. Because it captures all spending, the obligation pace is slow to reflect disruptions to new research funding specifically. See the <em>New Awards</em> tab for that view.
+                    <strong>At a glance.</strong> Current award-making and spending pace at five major federal science agencies, compared to historical averages. Click an agency's card for temporal trends; and view detailed data, graphs, and metrics in the outcome-specific tabs above.
+                </div>
+                <div id="overview-cards" class="overview-cards"></div>
+                <div class="overview-glossary">
+                    <p><strong>New Awards</strong> &mdash; newly issued competitive grants and renewals, excluding continuations.</p>
+                    <p><strong>All Awards</strong> &mdash; total grant obligations, including continuations and modifications.</p>
+                    <p><strong>Obligations</strong> &mdash; all spending commitments: grants, contracts, salaries, and facilities.</p>
+                    <p>Percentages reflect cumulative dollar spending as a share of annual appropriations, compared to the historical average at the same point in the fiscal year. The <em>New Awards</em>, <em>All Awards</em>, and <em>Obligations</em> tabs above provide additional detail, including raw dollar amounts, award counts, and agency-level data.</p>
+                </div>
+            </section>
+
+            <!-- Obligations Tab -->
+            <section id="tab-obligations" class="tab-panel" role="tabpanel">
+                <div class="intro-text">
+                    <strong>What this tracks.</strong> This tab measures total obligation activity: binding commitments to spend federal funds, encompassing grants, contracts, salaries, continuations, and all other spending within each agency's research function. This is the broadest measure of agency spending, capturing every category of expenditure, not just grants. The data come from OMB's SF-133 Report on Budget Execution, reported monthly for each fiscal year. Obligation spending is normalized to each agency's appropriation, rather than compared in raw dollar terms or as a fraction of end-of-year totals. This accounts for year-to-year changes in agency budgets and for years in which agencies do not fully spend their appropriation.
                 </div>
 
                 <div class="chart-header">
@@ -96,7 +112,7 @@
             <!-- New Awards Tab -->
             <section id="tab-awards" class="tab-panel" role="tabpanel">
                 <div class="intro-text" id="awards-intro-callout">
-                    <strong>What this tracks.</strong> The obligation data on the previous tab capture total spending commitments, including continuations, salaries, and contracts. This tab focuses on new grant-making. For NIH and NSF, data come from agency-specific APIs (NIH Reporter, NSF Awards). For DOE, NASA, and USDA, new award obligations are drawn from USASpending.gov. All sources are filtered to new awards only, excluding continuations and modifications. New grant spending is normalized to each agency's appropriation, rather than compared in raw dollar terms or as a fraction of end-of-year totals. This accounts for year-to-year changes in agency budgets and for years in which agencies do not fully spend their appropriation.
+                    <strong>What this tracks.</strong> This tab measures new competitive grant-making activity: newly issued awards and competing renewals, excluding non-competing continuations, modifications, and supplements. For NIH and NSF, data come from agency-specific APIs (NIH Reporter, NSF Awards). For DOE, NASA, and USDA, new award obligations are drawn from USASpending.gov. New grant spending is normalized to each agency's appropriation, rather than compared in raw dollar terms or as a fraction of end-of-year totals. This accounts for year-to-year changes in agency budgets and for years in which agencies do not fully spend their appropriation.
                 </div>
 
                 <div class="chart-header">
@@ -115,7 +131,7 @@
 
                 <div class="section-divider" aria-hidden="true"><span class="divider-line"></span><span class="divider-ornament">&#x2726;</span><span class="divider-line"></span></div>
 
-                <h2 class="section-heading">Individual Agency Award Trends</h2>
+                <h2 class="section-heading">Individual Agency Trends &mdash; New Awards</h2>
                 <p class="section-subheading">Cumulative new awards over the fiscal year, plotted against the range of prior years.</p>
                 <div class="chart-wide">
                     <div class="agency-grid" id="awards-small-multiples"></div>
@@ -154,6 +170,67 @@
                 </div>
             </section>
 
+            <!-- All Awards Tab -->
+            <section id="tab-awards-all" class="tab-panel" role="tabpanel">
+                <div class="intro-text" id="awards-all-intro-callout">
+                    <strong>What this tracks.</strong> This tab measures total grant obligation activity, including new awards, non-competing continuations, renewals, and modifications to existing grants. This isolates the grant component of agency spending&mdash;a substantial portion of which, in any given year, is continuing obligations on previously awarded grants. All data come from USASpending.gov, providing a consistent methodology across all five agencies. Grant spending is normalized to each agency's appropriation, rather than compared in raw dollar terms or as a fraction of end-of-year totals. This accounts for year-to-year changes in agency budgets and for years in which agencies do not fully spend their appropriation.
+                </div>
+
+                <div class="chart-header">
+                    <h2 class="section-heading" id="awards-all-multi-title"></h2>
+                    <p class="chart-subtitle">Each line shows how an agency's current total award-making pace compares to its historical average. A value of 0% means the agency is on pace; negative values mean it has issued fewer total award dollars than it typically would have by that point in the fiscal year.</p>
+                </div>
+
+                <div class="chart-wide">
+                    <div class="chart-card">
+                        <div id="chart-awards-all-multi" aria-label="Multi-agency all-awards pace comparison chart"></div>
+                    </div>
+                </div>
+
+                <div class="callout">
+                    <strong>Reading this chart:</strong> The 0% line means an agency is exactly on its historical total award-making pace. An agency at &minus;50% has issued half the total award dollars it normally would have by this point in the fiscal year, as a share of its annual appropriation. The dashed segment at the start of each line bridges from October to the first available data point.
+                </div>
+
+                <div class="section-divider" aria-hidden="true"><span class="divider-line"></span><span class="divider-ornament">&#x2726;</span><span class="divider-line"></span></div>
+
+                <h2 class="section-heading">Individual Agency Trends &mdash; All Awards</h2>
+                <p class="section-subheading">Cumulative grant obligations over the fiscal year, plotted against the range of prior years.</p>
+                <div class="chart-wide">
+                    <div class="agency-grid" id="awards-all-small-multiples"></div>
+                </div>
+
+                <div class="section-divider" aria-hidden="true"><span class="divider-line"></span><span class="divider-ornament">&#x2726;</span><span class="divider-line"></span></div>
+
+                <div class="section-heading-inline">
+                    <h2 class="section-heading">Agency Detail:</h2>
+                    <div class="select-wrapper select-inline">
+                        <select id="awards-all-agency-select"></select>
+                    </div>
+                </div>
+                <p class="section-subheading">Summary metrics and a cumulative chart for the selected agency, including all award types.</p>
+
+                <div class="metrics-row" id="awards-all-metrics"></div>
+
+                <div class="chart-controls">
+                    <div class="segmented-control" id="awards-all-view-mode">
+                        <button class="seg-btn active" data-mode="pct">% of Approp</button>
+                        <button class="seg-btn" data-mode="dollars">Dollars</button>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div id="chart-awards-all-detail" aria-label="Agency all-awards cumulative chart"></div>
+                </div>
+
+                <div class="export-toolbar">
+                    <span class="export-toolbar-label">Export</span>
+                    <div class="export-buttons">
+                        <button class="btn-export" id="btn-awards-all-download-png">PNG</button>
+                        <button class="btn-export" id="btn-awards-all-download-csv">CSV</button>
+                    </div>
+                </div>
+            </section>
+
             <!-- Data & Methods Tab -->
             <section id="tab-data" class="tab-panel" role="tabpanel">
                 <div class="data-view-switcher">
@@ -161,6 +238,7 @@
                         <select id="data-section-select">
                             <option value="obligations">Obligations</option>
                             <option value="awards">New Awards</option>
+                            <option value="awards-all">All Awards</option>
                         </select>
                     </div>
                 </div>
@@ -246,73 +324,65 @@
                 <!-- New Awards Data Section -->
                 <div id="data-section-awards" class="data-section" style="display:none;">
                     <div class="intro-text">
-                        <strong>Methodology.</strong> New award data cover the pace of grant-making: how many new grants are issued and
-                        how much new funding is committed. This is distinct from total obligation figures, which include continuing grants,
-                        salaries, and contracts. Awards are drawn from agency-specific APIs and grant databases, filtered to new and
-                        competing-renewal grants, and normalized against discretionary appropriations to allow comparison across years and agencies.
+                        <strong>Methodology.</strong> New award figures measure the pace of competitive grant-making: how many new grants
+                        are issued and how much new funding is committed each fiscal year. Data are drawn from agency-specific APIs and
+                        grant databases, filtered to new and competing-renewal grants, and normalized against discretionary appropriations
+                        to allow comparison across years and agencies.
 
-                        <p><strong>NIH</strong> data comes from the <a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a>.
-                        Awards are filtered to Type 1 (new) and Type 2 (competing renewal) extramural grants, excluding subprojects
-                        and intramural research (activity codes starting with Z). Date is based on the award notice date.
-                        Data is available daily from FY2016 onward.</p>
+                        <p><strong>Data sources.</strong> NIH and NSF data come from agency-specific APIs that provide daily, award-level
+                        records. DOE, NASA, and USDA data come from USASpending.gov, which provides monthly aggregates.</p>
 
-                        <p><strong>NSF</strong> data comes from the <a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a>,
-                        covering Research &amp; Related Activities, STEM Education, Technology Innovation &amp; Partnerships, and Integrative Activities
-                        (CFDA programs 47.041, .049, .050, .070, .074, .075, .076, .083, .084).
-                        All new awards are included, dated by the award decision date (not the project start date, which may be months later).
-                        Dollar amounts represent the initial obligation recorded for each award, extracted from
-                        the per-year funding breakdown in the NSF API. For standard grants, this equals the full award value;
-                        for continuing grants, it is the first-year increment.
-                        A small proportion of awards (~1%, stable across all fiscal years) lack per-year obligation data
-                        and are included in award counts but excluded from dollar totals. This is likely a conservative choice:
-                        the alternative field available for these awards tended to overstate dollar amounts slightly more
-                        in earlier fiscal years, so including it would marginally inflate historical baselines relative to
-                        more recent years.
-                        Data is available daily from FY2016 onward.</p>
+                        <p><strong>Agency filtering.</strong></p>
+                        <table>
+                            <tr><th>Agency</th><th>Source</th><th>Filter</th></tr>
+                            <tr><td>NIH</td><td><a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a></td><td>Type 1 (new) + Type 2 (competing renewal) extramural grants. Excludes subprojects, intramural research (activity codes starting with Z).</td></tr>
+                            <tr><td>NSF</td><td><a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a></td><td>Awards by decision date in CFDA programs 47.041, .049, .050, .070, .074, .075, .076, .083, .084 (R&amp;RA, STEM Education, TIP, Integrative Activities).</td></tr>
+                            <tr><td>DOE</td><td><a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a></td><td>CFDA 81.049, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
+                            <tr><td>NASA</td><td>USASpending.gov</td><td>CFDA 43.001, 43.013, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
+                            <tr><td>USDA</td><td>USASpending.gov</td><td>CFDA 10.310, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
+                        </table>
 
-                        <p><strong>DOE Office of Science, NASA Science, and USDA</strong> data comes from
-                        <a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a>,
-                        filtered to project grants and cooperative agreements (award type codes 04 and 05) under agency-specific CFDA program numbers.
-                        The <code>new_awards_only</code> filter excludes continuations and modifications.
-                        Data is reported monthly. USASpending coverage begins in FY2017&ndash;2019 depending on the agency;
-                        years with incomplete data are automatically excluded from the historical baseline.</p>
+                        <p><strong>Dollar amounts.</strong> NIH dollar amounts are the award amount reported by NIH Reporter.
+                        NSF dollar amounts represent the initial-year obligation extracted from the per-year funding breakdown
+                        in the NSF API; for standard grants, this equals the full award value, and for continuing grants, it is
+                        the first-year increment. A small proportion of NSF awards (~1%, stable across fiscal years) lack per-year
+                        obligation data and are included in award counts but excluded from dollar totals.
+                        USASpending amounts are monthly aggregated obligation dollars. All dollar figures are nominal and
+                        not adjusted for inflation.</p>
 
-                        <p><strong>Comparability.</strong> Each source is filtered to approximate new competitive grant activity,
-                        but the exact construct differs: NIH includes Type 1 (new) and Type 2 (competing renewal) grants from NIH Reporter,
-                        NSF includes awards by decision date from the NSF Awards API, and USASpending is filtered to new award obligations.
-                        These series are broadly comparable as measures of new competitive grant activity, but they are not identical
-                        administrative constructs.</p>
+                        <p><strong>Award counts.</strong> Individual award counts are available for NIH and NSF, which provide
+                        award-level records. USASpending reports monthly aggregates, so award counts are not available for
+                        DOE, NASA, or USDA.</p>
+
+                        <p><strong>Comparability.</strong> Each source approximates new competitive grant activity, but the
+                        administrative constructs differ. NIH distinguishes award types explicitly (Type 1, Type 2). NSF captures all
+                        awards by decision date. USASpending uses a <code>new_awards_only</code> filter that isolates initial
+                        obligations on newly created award records. These series are broadly comparable but not identical.</p>
 
                         <!-- MAINTENANCE: Update FY ranges below when BAND_YEARS_EXCLUDE changes in config.py -->
-                        <p><strong>Historical range.</strong> The shaded band on award charts shows the minimum-to-maximum range across
-                        available prior fiscal years. The dashed line shows the average. Because USASpending data availability varies by agency,
-                        the baseline period may differ: NIH and NSF use FY2016&ndash;2024, while DOE begins FY2019, USDA begins FY2018,
-                        and NASA begins FY2017. Years with incomplete source coverage are automatically excluded from the baseline.</p>
+                        <p><strong>Historical range.</strong> The shaded band on charts shows the minimum-to-maximum range across
+                        available prior fiscal years; the dashed line shows the average. NIH and NSF baselines cover FY2016&ndash;2024.
+                        USASpending coverage begins later for some agencies: NASA from FY2017, USDA from FY2018, DOE from FY2019.
+                        Years with incomplete source coverage are automatically excluded. FY2025 and FY2026 are shown as individual
+                        lines and excluded from the historical band.</p>
 
-                        <p><strong>Normalization.</strong> To compare across years and agencies, cumulative new award dollars are expressed
-                        as a percentage of the discretionary appropriation (SF-133 Line 1100) for the relevant research component.
-                        Mandatory appropriation (Line 1200) is excluded from the awards denominator because competitive grants are
-                        funded from discretionary accounts; mandatory funding supports specific earmarked programs. (The Obligations
-                        tab uses discretionary + mandatory as its denominator because it tracks all spending activity.)
-                        This removes variation from budget changes over time, isolating changes in award-making pace.
-                        The overview chart divides the current value by the historical average at the same point in the fiscal year
-                        to produce the &ldquo;% of average pace&rdquo; metric. Metric cards use the same normalization: year-over-year and
-                        vs-average comparisons are based on appropriation-normalized values, not raw dollar amounts.
-                        Agencies whose average appropriation share is below 0.05% at a given point are excluded from the overview chart
-                        to avoid noisy ratios from small denominators.
-                        Year-over-year and versus-average comparisons in the metric cards are expressed as percentage-point differences,
-                        while the overview chart expresses pace as a ratio relative to the historical average.</p>
+                        <p><strong>Normalization.</strong> Cumulative new award dollars are expressed as a percentage of the
+                        discretionary appropriation (SF-133 Line 1100) for the relevant research component. Mandatory appropriation
+                        (Line 1200) is excluded because competitive grants are funded from discretionary accounts. The overview chart
+                        divides the current value by the historical average at the same point in the fiscal year to produce the
+                        &ldquo;vs. average pace&rdquo; metric. Agencies whose average appropriation share is below 0.05% at a given
+                        point are excluded from the overview chart to avoid noisy ratios from small denominators.</p>
 
-                        <p><strong>Update cadence.</strong> Obligations reflect monthly SF-133 reporting. Award data reflect source-specific
-                        agency feeds and may cover a more recent period. Where the latest source period is partial, the final
-                        point is shown provisionally.</p>
+                        <p><strong>Update cadence.</strong> NIH and NSF data are fetched from agency APIs; caches expire after
+                        24 hours for the current fiscal year. USASpending data is also refreshed on a 24-hour cycle. Where
+                        the latest reporting period is partial, the final data point is shown provisionally.</p>
                     </div>
 
-                    <h2 class="section-heading">Award Time Series</h2>
-                    <p class="section-subheading">Cumulative new award data underlying the award charts. All dollar amounts are nominal.</p>
+                    <h2 class="section-heading">New Award Time Series</h2>
+                    <p class="section-subheading">Cumulative new award data underlying the charts. All dollar amounts are nominal.</p>
                     <div class="table-wrapper">
                         <table id="table-awards-series" class="data-table">
-                            <caption>Cumulative new awards by agency, fiscal year, and date. Sufficient to reproduce all award charts.</caption>
+                            <caption>Cumulative new awards by agency, fiscal year, and date.</caption>
                             <thead></thead>
                             <tbody></tbody>
                         </table>
@@ -326,7 +396,7 @@
                             <dd>A Type 1 (new) or Type 2 (competing renewal) grant, as classified by NIH. Excludes non-competing continuations, supplements, and subprojects.</dd>
 
                             <dt>New Award (NSF)</dt>
-                            <dd>An award whose decision date falls within the fiscal year, deduplicated at the award level. Continuing grant increments are counted as separate awards only if they receive distinct award IDs from NSF.</dd>
+                            <dd>An award whose decision date falls within the fiscal year, deduplicated at the award level.</dd>
 
                             <dt>New Grant Obligation (USASpending)</dt>
                             <dd>A project grant or cooperative agreement obligation classified as a new award by USASpending.gov, excluding modifications to existing awards.</dd>
@@ -335,10 +405,104 @@
                             <dd>Running total of new award dollars from the start of the fiscal year (October 1) through the latest available date.</dd>
 
                             <dt>% of Appropriation</dt>
-                            <dd>Cumulative new award dollars divided by the agency's full-year discretionary appropriation (SF-133 Line 1100). Provides a budget-normalized view of award pace.</dd>
+                            <dd>Cumulative new award dollars divided by the agency&rsquo;s full-year discretionary appropriation (SF-133 Line 1100).</dd>
                         </dl>
                     </div>
                 </div>
+
+                <!-- All Awards Data Section -->
+                <div id="data-section-awards-all" class="data-section" style="display:none;">
+                    <div class="intro-text">
+                        <strong>Methodology.</strong> All-awards figures measure total grant obligation activity: new awards,
+                        non-competing continuations, renewals, and modifications to existing awards. This captures the full scope of
+                        grant funding flowing to the research community in a given fiscal year.
+
+                        <p><strong>Data source.</strong> All five agencies use
+                        <a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a> as a unified data
+                        source, queried through the
+                        <a href="https://api.usaspending.gov/" target="_blank" rel="noopener">spending-over-time API</a>.
+                        This provides consistent methodology across agencies. USASpending reports monthly aggregated obligation
+                        amounts; individual award counts are not available.</p>
+
+                        <p><strong>Date filter.</strong> Queries use the <code>action_date</code> date type, which captures all
+                        grant obligations where the action (new award, continuation, modification, or renewal) occurred during
+                        the fiscal year. This is broader than the <code>new_awards_only</code> filter used for new award tracking,
+                        which captures only initial obligations on newly created award records.</p>
+
+                        <p><strong>Award types.</strong> Queries are filtered to project grants (award type code 04) and
+                        cooperative agreements (award type code 05). Contracts, direct payments, and other non-grant
+                        instruments are excluded.</p>
+
+                        <p><strong>Agency filtering.</strong></p>
+                        <table>
+                            <tr><th>Agency</th><th>Filter</th></tr>
+                            <tr><td>NIH</td><td>Awarding subtier agency: National Institutes of Health</td></tr>
+                            <tr><td>NSF</td><td>CFDA 47.041, .049, .050, .070, .074, .075, .076, .083, .084</td></tr>
+                            <tr><td>DOE Office of Science</td><td>CFDA 81.049</td></tr>
+                            <tr><td>NASA Science</td><td>CFDA 43.001, 43.013</td></tr>
+                            <tr><td>USDA (ARS + NIFA)</td><td>CFDA 10.310</td></tr>
+                        </table>
+
+                        <p><strong>Negative obligations.</strong> Because <code>action_date</code> captures all transaction types,
+                        including deobligations and downward adjustments on existing awards, cumulative totals may briefly go
+                        negative early in a fiscal year when adjustments to prior-year awards precede new obligation activity.
+                        Charts floor these values at zero for readability; the underlying data retains the actual values.</p>
+
+                        <!-- MAINTENANCE: Update FY ranges below when BAND_YEARS_EXCLUDE changes in config.py -->
+                        <p><strong>Historical range.</strong> The shaded band on charts shows the minimum-to-maximum range across
+                        available prior fiscal years; the dashed line shows the average. USASpending coverage begins in different years
+                        by agency: NIH and NSF from FY2016, NASA from FY2017, USDA from FY2018, DOE from FY2019. Years with
+                        incomplete source coverage are automatically excluded. FY2025 and FY2026 are shown as individual lines and
+                        excluded from the historical band.</p>
+
+                        <p><strong>Normalization.</strong> Cumulative grant obligation dollars are expressed as a percentage of the
+                        discretionary appropriation (SF-133 Line 1100) for the relevant research component. Mandatory appropriation
+                        (Line 1200) is excluded because competitive grants are funded from discretionary accounts. The overview chart
+                        divides the current value by the historical average at the same point in the fiscal year to produce the
+                        &ldquo;vs. average pace&rdquo; metric. Agencies whose average appropriation share is below 0.05% at a given
+                        point are excluded from the overview chart to avoid noisy ratios from small denominators.</p>
+
+                        <p><strong>Update cadence.</strong> USASpending data is refreshed on a 24-hour cycle for the current
+                        fiscal year. Where the latest reporting period is partial, the final data point is shown provisionally.</p>
+
+                        <p><strong>Dollar amounts.</strong> All dollar figures are nominal and not adjusted for inflation.</p>
+                    </div>
+
+                    <h2 class="section-heading">All Awards Time Series</h2>
+                    <p class="section-subheading">Cumulative grant obligation data underlying the charts. All dollar amounts are nominal.</p>
+                    <div class="table-wrapper">
+                        <table id="table-awards-all-series" class="data-table">
+                            <caption>Cumulative grant obligations by agency, fiscal year, and month.</caption>
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 0.5rem;"><button class="btn-export" id="btn-awards-all-table-csv">Download CSV</button></div>
+
+                    <div class="glossary">
+                        <h3>Glossary</h3>
+                        <dl>
+                            <dt>Grant Obligation</dt>
+                            <dd>A binding commitment to pay for a grant award, including new awards, continuations, renewals, and modifications. Recorded by USASpending.gov at the transaction level.</dd>
+
+                            <dt>Action Date</dt>
+                            <dd>The date on which a grant transaction (new award, modification, continuation, or renewal) was executed. Used to assign obligations to fiscal years.</dd>
+
+                            <dt>Project Grant (Type 04)</dt>
+                            <dd>A federal grant providing direct financial assistance for a specific research project or activity.</dd>
+
+                            <dt>Cooperative Agreement (Type 05)</dt>
+                            <dd>A federal award providing financial assistance where substantial federal involvement is anticipated during the project.</dd>
+
+                            <dt>Cumulative Dollars</dt>
+                            <dd>Running total of grant obligation dollars from the start of the fiscal year (October 1) through the latest available month.</dd>
+
+                            <dt>% of Appropriation</dt>
+                            <dd>Cumulative grant obligation dollars divided by the agency&rsquo;s full-year discretionary appropriation (SF-133 Line 1100).</dd>
+                        </dl>
+                    </div>
+                </div>
+
             </section>
             <!-- USASpending Comparison Tab (experimental, hidden unless data present) -->
             <section id="tab-unified" class="tab-panel" role="tabpanel">
@@ -357,7 +521,7 @@
                     </div>
                 </div>
 
-                <h2 class="section-heading">Individual Agency Trends (USASpending)</h2>
+                <h2 class="section-heading">Individual Agency Trends &mdash; USASpending</h2>
                 <p class="section-subheading">Cumulative new award obligations from USASpending, plotted against the range of prior years.</p>
                 <div class="chart-wide">
                     <div class="agency-grid" id="unified-small-multiples"></div>

@@ -65,7 +65,7 @@ USA_UNIFIED_CONFIG = {
                 "name": "Department of Energy",
             }
         ],
-        "cfda": ["81.049"],
+        "cfda": ["81.049", "81.135"],
     },
     "NASA_SCI": {
         "agencies": [
