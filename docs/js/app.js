@@ -917,10 +917,16 @@
         }
 
         html += '</tbody></table>';
-        if (rows.some(r => r.footnote)) {
-            html += '<div class="summary-table-footnotes"><p><sup>†</sup> Affected by changes in annual appropriations</p></div>';
-        }
         container.innerHTML = html;
+        // Footnotes outside the scrollable container
+        var existingFn = container.nextElementSibling;
+        if (existingFn && existingFn.classList.contains('summary-table-footnotes')) existingFn.remove();
+        if (rows.some(r => r.footnote)) {
+            var fn = document.createElement('div');
+            fn.className = 'summary-table-footnotes';
+            fn.innerHTML = '<p><sup>†</sup> Affected by changes in annual appropriations</p>';
+            container.after(fn);
+        }
     }
 
     // ── Agency Detail (within Obligations tab) ──
@@ -1943,11 +1949,17 @@
         }
 
         html += '</tbody></table>';
-        html += '<div class="summary-table-footnotes">';
-        if (hasCounts) html += '<p><sup>†</sup> Affected by changes in prevalence of multi-year funding</p>';
-        html += '<p><sup>†</sup> Affected by changes in annual appropriations</p>';
-        html += '</div>';
         container.innerHTML = html;
+        // Footnotes outside the scrollable container
+        var existingFn = container.nextElementSibling;
+        if (existingFn && existingFn.classList.contains('summary-table-footnotes')) existingFn.remove();
+        var fnHtml = '';
+        if (hasCounts) fnHtml += '<p><sup>†</sup> Affected by changes in prevalence of multi-year funding</p>';
+        fnHtml += '<p><sup>‡</sup> Affected by changes in annual appropriations</p>';
+        var fn = document.createElement('div');
+        fn.className = 'summary-table-footnotes';
+        fn.innerHTML = fnHtml;
+        container.after(fn);
     }
 
     // ── Awards: Detail View ──
