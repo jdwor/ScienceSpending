@@ -418,36 +418,12 @@
         const expandedCharts = new Set();
         const allCards = Array.from(container.querySelectorAll('.overview-card'));
 
-        function getRowStart(card) {
-            // Find which row this card is on by checking its top offset
-            const rect = card.getBoundingClientRect();
-            return Math.round(rect.top);
-        }
-
-        function setRowOrder(expandedCard) {
-            // Reset all orders
-            allCards.forEach(c => c.style.order = '');
-            if (!expandedCard) return;
-
-            // Find cards on the same row as the expanded card (before expansion)
-            // Use the card's index to determine row: with auto-fit columns,
-            // we read the computed grid to find columns per row
-            const style = getComputedStyle(container);
-            const cols = style.gridTemplateColumns.split(' ').length;
-            const idx = allCards.indexOf(expandedCard);
-            const rowStart = Math.floor(idx / cols) * cols;
-
-            // Set order so expanded card comes first in its row
-            for (let i = 0; i < allCards.length; i++) {
-                if (i === idx) {
-                    allCards[i].style.order = String(rowStart);
-                } else if (i >= rowStart && i < rowStart + cols) {
-                    // Same row — push after expanded
-                    allCards[i].style.order = String(rowStart + 1 + (i - rowStart));
-                } else {
-                    allCards[i].style.order = String(i < rowStart ? i : i + 1);
-                }
-            }
+        function scrollCardIntoView(card) {
+            // Account for sticky nav height + a little breathing room
+            const nav = document.querySelector('.tab-nav');
+            const navHeight = nav ? nav.offsetHeight : 0;
+            const top = card.getBoundingClientRect().top + window.scrollY - navHeight - 12;
+            window.scrollTo({ top, behavior: 'smooth' });
         }
 
         function suppressLegendsAndTitles(card) {
@@ -465,11 +441,15 @@
                 container.querySelectorAll('.overview-card.expanded').forEach(c => {
                     c.classList.remove('expanded');
                 });
-                setRowOrder(null);
+
+                if (wasExpanded) {
+                    // Scroll back to the collapsed card so the user doesn't lose their place
+                    scrollCardIntoView(card);
+                }
 
                 if (!wasExpanded) {
-                    setRowOrder(card);
                     card.classList.add('expanded');
+                    scrollCardIntoView(card);
 
                     if (!expandedCharts.has(agencyKey)) {
                         expandedCharts.add(agencyKey);
