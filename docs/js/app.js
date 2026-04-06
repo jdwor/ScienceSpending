@@ -1918,7 +1918,7 @@
                 current: formatDollars(summ.cumul_dollars),
                 avg: summ.mean_dollars != null ? formatDollars(summ.mean_dollars) : 'N/A',
                 vs: r,
-                vsSup: '†',
+                vsSup: '‡',
             });
         }
 
