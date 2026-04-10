@@ -73,19 +73,17 @@ def _build_daily_cumulative(df: pd.DataFrame, agency_key: str) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def _fy_month_to_next_boundary(fy_month: int, fiscal_year: int) -> date:
-    """Convert a fiscal-year month to the first day of the NEXT calendar month.
+def _fy_month_to_last_day(fy_month: int, fiscal_year: int) -> date:
+    """Convert a fiscal-year month to the last calendar day of that month.
 
-    This places "cumulative through end of October" at the Nov 1 boundary,
-    matching how obligations data sits on month boundaries.
+    This places "cumulative through end of October" at Oct 31, so hover
+    tooltips can display the actual end-of-month date.
     """
-    next_month = (fy_month % 12) + 1  # next fiscal month (1-12)
-    cal_month = (next_month + 8) % 12 + 1
+    import calendar
+    cal_month = (fy_month + 8) % 12 + 1
     cal_year = fiscal_year - 1 if cal_month >= 10 else fiscal_year
-    # For fy_month 12 (Sep), next month is Oct of the following FY
-    if fy_month == 12:
-        cal_year = fiscal_year
-    return date(cal_year, cal_month, 1)
+    last_day = calendar.monthrange(cal_year, cal_month)[1]
+    return date(cal_year, cal_month, last_day)
 
 
 def _build_monthly_cumulative(
@@ -162,11 +160,11 @@ def _build_monthly_cumulative(
                     is_provisional = True
                 else:
                     # Complete month — place at next-month boundary
-                    d = _fy_month_to_next_boundary(fy_month, fy_int)
+                    d = _fy_month_to_last_day(fy_month, fy_int)
                     is_provisional = False
             else:
                 # Past FY or all months complete
-                d = _fy_month_to_next_boundary(fy_month, fy_int)
+                d = _fy_month_to_last_day(fy_month, fy_int)
                 is_provisional = False
 
             records.append({

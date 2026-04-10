@@ -65,17 +65,44 @@
                  7: "Apr", 8: "May", 9: "Jun", 10: "Jul", 11: "Aug", 12: "Sep" };
     }
 
+    var MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    function fyMonthEndDate(fy, m) {
+        // Convert fiscal year + month index (1=Oct..12=Sep) to "Nov 30, 2025"
+        var calMonth = (m + 8) % 12;          // 0-indexed: 0=Jan, 9=Oct
+        var calYear = calMonth >= 9 ? fy - 1 : fy;
+        var lastDay = new Date(calYear, calMonth + 1, 0).getDate();
+        return MONTH_NAMES[calMonth] + " " + lastDay + ", " + calYear;
+    }
+
+    function formatISODate(isoStr) {
+        // Convert "2025-12-15" to "Dec 15, 2025"
+        var parts = isoStr.split('-');
+        var y = parseInt(parts[0], 10);
+        var monthIdx = parseInt(parts[1], 10) - 1;
+        var day = parseInt(parts[2], 10);
+        return MONTH_NAMES[monthIdx] + " " + day + ", " + y;
+    }
+
     function tickArrays() {
         // Tick marks at month BOUNDARIES: 0 = start of Oct, 1 = end of Oct /
         // start of Nov, ..., 12 = end of Sep.
-        // ticktext carries month names for hover headers (invisible on the axis
-        // via transparent tickfont); annotations provide visible labels at midpoints.
-        const labels = fyMonthLabels();
+        // ticktext carries end-of-month dates for hover headers (invisible on
+        // the axis via transparent tickfont); annotations provide visible
+        // labels at midpoints.
         const vals = [];
         const texts = [];
         for (let i = 0; i <= 12; i++) {
             vals.push(i);
-            texts.push(i >= 1 && i <= 12 ? labels[i] : '');
+            if (i >= 1 && i <= 12) {
+                // End-of-month date without year (used as unified hover header)
+                var calMonth = (i + 8) % 12; // 0-indexed
+                var calYear = calMonth >= 9 ? 2000 : 2001; // ref year
+                var lastDay = new Date(calYear, calMonth + 1, 0).getDate();
+                texts.push(MONTH_NAMES[calMonth] + " " + lastDay);
+            } else {
+                texts.push('');
+            }
         }
         return { vals, texts };
     }
@@ -505,7 +532,7 @@
             const months = trace.months;
             const vals = trace.pct_of_mean;
 
-            const labels = fyMonthLabels();
+            const currentFy = cfg.current_fy;
 
             // Dashed lead-in from start of Oct (x=0) at midpoint to first real data point
             if (months.length > 0) {
@@ -520,7 +547,7 @@
                 });
             }
 
-            const mainText = months.map(m => labels[m] || '');
+            const mainText = months.map(m => fyMonthEndDate(currentFy, m));
 
             traces.push({
                 x: months,
@@ -747,7 +774,7 @@
                 dtick: 'M1',
                 tickformat: '%b',
                 ticklabelmode: 'period',
-                hoverformat: '%b',
+                hoverformat: '%b %-d',
                 range: ['2000-09-25', '2001-10-05'],
                 showgrid: true,
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
@@ -1335,6 +1362,13 @@
         return '';
     }
 
+    function fyDayToActualDate(day, fy) {
+        // Convert fy_day (1=Oct 1) + fiscal year to "Dec 15, 2025"
+        var d = new Date(fy - 1, 9, 1); // Oct 1 of prior calendar year
+        d.setDate(d.getDate() + day - 1);
+        return MONTH_NAMES[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+    }
+
     // Map fy_day (1–366) to a date string in a fixed reference fiscal year
     // (FY2001: Oct 2000 – Sep 2001).  Using real dates lets the Plotly date
     // axis format hover headers as month names automatically.
@@ -1501,7 +1535,7 @@
                 name: agencyCfg.display_name,
                 line: { color: agencyCfg.color, width: 2.5 },
                 marker: { size: isDaily ? 4 : 5, color: agencyCfg.color },
-                text: plotX.map(d => fyDayToMonth(d)),
+                text: plotX.map(d => fyDayToActualDate(d, currentFy)),
                 customdata: plotY.map(v => fmtSigned(v)),
                 hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agencyCfg.color },
@@ -1514,7 +1548,7 @@
                     mode: 'lines',
                     name: agencyCfg.display_name,
                     line: { color: agencyCfg.color, width: 2.5 },
-                    text: tailX.map(d => fyDayToMonth(d)),
+                    text: tailX.map(d => fyDayToActualDate(d, currentFy)),
                     customdata: tailY.map(v => fmtSigned(v)),
                     hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                     hoverlabel: { bordercolor: agencyCfg.color },
@@ -1769,7 +1803,7 @@
                 dtick: 'M1',
                 tickformat: '%b',
                 ticklabelmode: 'period',
-                hoverformat: '%b',
+                hoverformat: '%b %-d',
                 range: ['2000-09-25', '2001-10-05'],
                 showgrid: true,
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
@@ -2130,7 +2164,7 @@
                 name: agencyCfg.display_name,
                 line: { color: agencyCfg.color, width: 2.5 },
                 marker: { size: 5, color: agencyCfg.color },
-                text: plotX.map(function(d) { return fyDayToMonth(d); }),
+                text: plotX.map(function(d) { return fyDayToActualDate(d, currentFy); }),
                 customdata: plotY.map(function(v) { return fmtSigned(v); }),
                 hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                 hoverlabel: { bordercolor: agencyCfg.color },
@@ -2141,7 +2175,7 @@
                     mode: 'lines',
                     name: agencyCfg.display_name,
                     line: { color: agencyCfg.color, width: 2.5 },
-                    text: tailX.map(function(d) { return fyDayToMonth(d); }),
+                    text: tailX.map(function(d) { return fyDayToActualDate(d, currentFy); }),
                     customdata: tailY.map(function(v) { return fmtSigned(v); }),
                     hovertemplate: '<b>' + agencyCfg.display_name + '</b><br>%{text}: %{customdata} vs. avg. pace<extra></extra>',
                     hoverlabel: { bordercolor: agencyCfg.color },
@@ -2315,7 +2349,7 @@
             },
             xaxis: Object.assign({}, baseAxisStyle(), {
                 type: 'date', dtick: 'M1', tickformat: '%b', ticklabelmode: 'period',
-                hoverformat: '%b', range: ['2000-09-25', '2001-10-05'], showgrid: true,
+                hoverformat: '%b %-d', range: ['2000-09-25', '2001-10-05'], showgrid: true,
                 tickfont: { family: FONT_SANS, size: compact ? 10 : 11, color: MUTED_COLOR },
             }),
             yaxis: Object.assign({}, baseAxisStyle(), {
