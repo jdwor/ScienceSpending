@@ -1006,6 +1006,7 @@
 
         agencySelect.addEventListener('change', updateSubSelect);
         subSelect.addEventListener('change', function() { if (onChange) onChange(); });
+        subSelect._updateSubSelect = updateSubSelect;
         updateSubSelect();
     }
 
@@ -1139,6 +1140,7 @@
         const rows = [];
         for (const [agencyKey, agencyData] of Object.entries(DATA.spenddown)) {
             if (!cfg.agencies[agencyKey]) continue;
+            if (cfg.agencies[agencyKey].parent) continue;
             for (const [fy, yearData] of Object.entries(agencyData.years)) {
                 // Use per-year appropriation from build data
                 var approp = yearData.appropriation;
@@ -1196,10 +1198,11 @@
 
         thead.innerHTML = '<tr>' + cols.map(function(c) { return '<th>' + c.label + '</th>'; }).join('') + '</tr>';
 
-        // Build rows from all year traces, sampling at month boundaries for daily data
+        // Build rows from parent agencies only (sub-agency detail excluded for performance)
         var rows = [];
         for (var agencyKey in awards) {
             if (!cfg.agencies[agencyKey]) continue;
+            if (cfg.agencies[agencyKey].parent) continue;
             var agencyData = awards[agencyKey];
             var isDaily = agencyData.source_type !== 'usaspending';
 
@@ -1286,6 +1289,7 @@
         var rows = [];
         for (var agencyKey in awards) {
             if (!cfg.agencies[agencyKey]) continue;
+            if (cfg.agencies[agencyKey].parent) continue;
             var agencyData = awards[agencyKey];
 
             for (var fi = 0; fi < agencyData.fiscal_years.length; fi++) {
@@ -2586,6 +2590,26 @@
 
     // ── Initialize ──
 
+    // Merge detail (sub-agency) data into DATA and refresh dropdowns
+    function mergeDetailData(detail) {
+        for (var section in detail) {
+            if (!DATA[section]) DATA[section] = {};
+            for (var key in detail[section]) {
+                DATA[section][key] = detail[section][key];
+            }
+        }
+        // Re-populate sub-agency dropdowns now that data is available
+        var pairs = [
+            ['agency-select', 'agency-sub-select', 'spenddown'],
+            ['awards-agency-select', 'awards-sub-select', 'awards'],
+            ['awards-all-agency-select', 'awards-all-sub-select', 'awards_all'],
+        ];
+        for (var i = 0; i < pairs.length; i++) {
+            var sub = document.getElementById(pairs[i][1]);
+            if (sub && sub._updateSubSelect) sub._updateSubSelect();
+        }
+    }
+
     async function init() {
         try {
             const resp = await fetch('data/site_data.json');
@@ -2613,6 +2637,12 @@
         // Overview cards render eagerly (default tab, no Plotly charts)
         renderOverviewCards();
         // All chart rendering is deferred to activateTab() so Plotly gets correct dimensions
+
+        // Load sub-agency detail data in the background
+        fetch('data/site_data_detail.json')
+            .then(function(r) { return r.json(); })
+            .then(mergeDetailData)
+            .catch(function() { /* detail data unavailable — parent-only mode */ });
     }
 
     if (document.readyState === 'loading') {

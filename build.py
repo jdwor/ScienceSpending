@@ -701,7 +701,6 @@ def main():
             site_data["awards_all_summary"] = all_awards_summary
 
     SITE_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = SITE_DATA_DIR / "site_data.json"
 
     class NumpyEncoder(json.JSONEncoder):
         def default(self, obj):
@@ -713,11 +712,39 @@ def main():
                 return obj.tolist()
             return super().default(obj)
 
-    with open(out_path, "w") as f:
-        json.dump(site_data, f, cls=NumpyEncoder)
+    # Split into parent-only (fast initial load) and sub-agency detail
+    agencies_cfg = site_data.get("config", {}).get("agencies", {})
+    sub_keys = {k for k, v in agencies_cfg.items() if v.get("parent")}
 
-    size_kb = out_path.stat().st_size / 1024
-    print(f"Wrote {out_path} ({size_kb:.0f} KB)")
+    # Sections that contain per-agency keyed data
+    agency_sections = [
+        "spenddown", "awards", "awards_all", "awards_unified",
+        "summaries", "awards_summary", "awards_all_summary", "awards_unified_summary",
+    ]
+
+    core_data = {}
+    detail_data = {}
+    for section, data in site_data.items():
+        if section in agency_sections and isinstance(data, dict):
+            core_data[section] = {k: v for k, v in data.items() if k not in sub_keys}
+            sub_part = {k: v for k, v in data.items() if k in sub_keys}
+            if sub_part:
+                detail_data[section] = sub_part
+        else:
+            core_data[section] = data
+
+    out_path = SITE_DATA_DIR / "site_data.json"
+    with open(out_path, "w") as f:
+        json.dump(core_data, f, cls=NumpyEncoder)
+    core_kb = out_path.stat().st_size / 1024
+
+    detail_path = SITE_DATA_DIR / "site_data_detail.json"
+    with open(detail_path, "w") as f:
+        json.dump(detail_data, f, cls=NumpyEncoder)
+    detail_kb = detail_path.stat().st_size / 1024
+
+    print(f"Wrote {out_path} ({core_kb:.0f} KB)")
+    print(f"Wrote {detail_path} ({detail_kb:.0f} KB)")
     print("Done. Open docs/index.html to view.")
 
 
