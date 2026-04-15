@@ -34,14 +34,29 @@ def load_csvs():
 
 
 def build_agency_configs():
-    """Export agency config for the frontend."""
-    return {
+    """Export agency config for the frontend.
+
+    Includes SF-133 agencies from AGENCIES, plus awards-only sub-agencies
+    from AWARDS_CONFIG that have a parent field but aren't in AGENCIES.
+    """
+    configs = {
         key: {
             "display_name": cfg["display_name"],
             "color": cfg["color"],
+            **({"parent": cfg["parent"]} if "parent" in cfg else {}),
         }
         for key, cfg in AGENCIES.items()
     }
+    # Add awards-only sub-agencies (e.g., NSF directorates)
+    for key, cfg in AWARDS_CONFIG.items():
+        if key not in configs and "parent" in cfg:
+            parent_cfg = AGENCIES.get(cfg["parent"], {})
+            configs[key] = {
+                "display_name": cfg.get("display_name", key),
+                "color": parent_cfg.get("color", "#666"),
+                "parent": cfg["parent"],
+            }
+    return configs
 
 
 def compute_prior_year_envelope(agency_data, fiscal_years, show_pct=True):
@@ -170,6 +185,8 @@ def build_multi_agency_data(obligation_series):
     traces = {}
 
     for agency_key in AGENCIES:
+        if "parent" in AGENCIES[agency_key]:
+            continue  # Only parent agencies in multi-agency chart
         agency_all = obligation_series[obligation_series["agency"] == agency_key]
         all_fys = sorted(agency_all["fiscal_year"].unique())
         agency_fy = agency_all[agency_all["fiscal_year"] == CURRENT_FY].sort_values("period_month")
@@ -257,7 +274,11 @@ def build_data_tables(approp_summary, yoy_comparison):
 
 
 def _load_approp_lookup():
-    """Build {agency: {fy: approp_dollars}} from SF-133 approp_summary."""
+    """Build {agency: {fy: approp_dollars}} from SF-133 approp_summary.
+
+    Sub-agencies without their own appropriation data fall back to their
+    parent agency's appropriation as the denominator.
+    """
     approp_path = PROCESSED_DIR / "approp_summary.csv"
     if not approp_path.exists():
         return {}
@@ -272,6 +293,13 @@ def _load_approp_lookup():
         val = row.get("approp_disc_raw")
         if pd.notna(val) and val > 0:
             lookup.setdefault(agency, {})[fy] = float(val)
+    # Fall back to parent appropriation for sub-agencies without their own
+    for key, cfg in AGENCIES.items():
+        if key not in lookup and "parent" in cfg and cfg["parent"] in lookup:
+            lookup[key] = lookup[cfg["parent"]]
+    for key, cfg in AWARDS_CONFIG.items():
+        if key not in lookup and "parent" in cfg and cfg["parent"] in lookup:
+            lookup[key] = lookup[cfg["parent"]]
     return lookup
 
 
@@ -656,7 +684,8 @@ def main():
         _saved_aa = {k: dict(v) for k, v in _acfg_aa.items()}
         for k in _aacfg:
             if k in _acfg_aa:
-                _acfg_aa[k] = {**_acfg_aa[k], **_aacfg[k], "source": "usaspending"}
+                _src = _aacfg[k].get("source", "usaspending")
+                _acfg_aa[k] = {**_acfg_aa[k], **_aacfg[k], "source": _src}
         try:
             all_awards_data, all_awards_summary = build_awards_site_data(
                 series_override=all_awards_series_path,

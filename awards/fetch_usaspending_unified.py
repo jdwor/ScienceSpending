@@ -87,6 +87,74 @@ USA_UNIFIED_CONFIG = {
         ],
         "cfda": ["10.310"],
     },
+    # Sub-agencies
+    "DOE_SC_SCI": {
+        "agencies": [
+            {
+                "type": "funding",
+                "tier": "toptier",
+                "name": "Department of Energy",
+            }
+        ],
+        "cfda": ["81.049"],
+    },
+    "DOE_ARPA_E": {
+        "agencies": [
+            {
+                "type": "funding",
+                "tier": "toptier",
+                "name": "Department of Energy",
+            }
+        ],
+        "cfda": ["81.135"],
+    },
+    "USDA_NIFA": {
+        "agencies": [
+            {
+                "type": "funding",
+                "tier": "toptier",
+                "name": "Department of Agriculture",
+            }
+        ],
+        "cfda": ["10.310"],
+    },
+    # NSF directorate sub-agencies (one CFDA each)
+    "NSF_ENG": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.041"],
+    },
+    "NSF_MPS": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.049"],
+    },
+    "NSF_GEO": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.050"],
+    },
+    "NSF_CISE": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.070"],
+    },
+    "NSF_BIO": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.074"],
+    },
+    "NSF_SBE": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.075"],
+    },
+    "NSF_EDU_AWD": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.076"],
+    },
+    "NSF_IA": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.083"],
+    },
+    "NSF_TIP": {
+        "agencies": [{"type": "funding", "tier": "toptier", "name": "National Science Foundation"}],
+        "cfda": ["47.084"],
+    },
 }
 
 

@@ -28,19 +28,23 @@ def fetch_all_awards(
 
     results: dict[str, pd.DataFrame] = {}
 
-    # NIH
-    if "NIH" in keys:
+    # NIH: fetch once, share with all NIH-family keys (parent + sub-agencies)
+    nih_keys = [k for k in keys if k == "NIH" or AWARDS_CONFIG.get(k, {}).get("source") == "nih_reporter"]
+    if nih_keys:
         df = fetch_nih_all(fiscal_years=years, force=force)
         if not df.empty:
-            results["NIH"] = df
+            for k in nih_keys:
+                results[k] = df
 
-    # NSF
-    if "NSF" in keys:
+    # NSF: fetch once, share with all NSF-family keys
+    nsf_keys = [k for k in keys if k == "NSF" or AWARDS_CONFIG.get(k, {}).get("source") == "nsf_awards"]
+    if nsf_keys:
         df = fetch_nsf_all(fiscal_years=years, force=force)
         if not df.empty:
-            results["NSF"] = df
+            for k in nsf_keys:
+                results[k] = df
 
-    # USASpending agencies
+    # USASpending agencies (each makes its own API call with distinct CFDAs)
     usa_keys = [k for k in keys if AWARDS_CONFIG.get(k, {}).get("source") == "usaspending"]
     if usa_keys:
         usa_data = fetch_usaspending_all(

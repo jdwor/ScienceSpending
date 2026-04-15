@@ -89,6 +89,7 @@
                     <h2 class="section-heading">Agency Detail:</h2>
                     <div class="select-wrapper select-inline">
                         <select id="agency-select"></select>
+                        <select id="agency-sub-select"></select>
                     </div>
                 </div>
                 <p class="section-subheading">Summary metrics and a detailed spend-down chart for the selected agency, with current-year data plotted against the historical range.</p>
@@ -149,6 +150,7 @@
                     <h2 class="section-heading">Agency Detail:</h2>
                     <div class="select-wrapper select-inline">
                         <select id="awards-agency-select"></select>
+                        <select id="awards-sub-select"></select>
                     </div>
                 </div>
                 <p class="section-subheading">Summary metrics and a cumulative award chart for the selected agency, with current-year data plotted against the historical range.</p>
@@ -211,6 +213,7 @@
                     <h2 class="section-heading">Agency Detail:</h2>
                     <div class="select-wrapper select-inline">
                         <select id="awards-all-agency-select"></select>
+                        <select id="awards-all-sub-select"></select>
                     </div>
                 </div>
                 <p class="section-subheading">Summary metrics and a cumulative chart for the selected agency, including all award types.</p>
@@ -279,10 +282,15 @@
                             <tr><th>Agency</th><th>SF-133 Filter</th><th>Scope</th></tr>
                             <tr><td>NIH</td><td>Bureau: &ldquo;National Institutes of Health,&rdquo; excl. TRACCTs 3966, 4554, 838</td><td>Research institutes &amp; OD (excl. Management Fund, Services &amp; Supply, Buildings)</td></tr>
                             <tr><td>NSF</td><td>TRACCTs 100, 106</td><td>Research &amp; Related Activities + STEM Education. TIP is budgeted within R&amp;RA. H-1B fee-funded accounts (TRACCT 5176) are excluded because they have no corresponding appropriation on Lines 1100/1200.</td></tr>
-                            <tr><td>DOE</td><td>TRACCT 222</td><td>Office of Science</td></tr>
+                            <tr><td>DOE</td><td>TRACCTs 222, 337</td><td>Office of Science + ARPA-E</td></tr>
                             <tr><td>NASA</td><td>TRACCT 120</td><td>Science Mission Directorate</td></tr>
                             <tr><td>USDA</td><td>TRACCTs 1400, 1500, 1502</td><td>Agricultural Research Service + National Institute of Food and Agriculture</td></tr>
                         </table>
+
+                        <p><strong>Sub-agency detail.</strong> The agency detail view offers sub-agency breakdowns for select agencies:
+                        NIH by Institute/Center (~25 ICs), NSF by R&amp;RA vs STEM Education, DOE by Office of Science vs ARPA-E,
+                        and USDA by ARS vs NIFA. Sub-agency views use the parent agency&rsquo;s total appropriation as the denominator
+                        for percentage calculations.</p>
 
                         <!-- MAINTENANCE: Update FY range below when BAND_YEARS_EXCLUDE changes in config.py -->
                         <p><strong>Historical range.</strong> The shaded band on spend-down charts shows the minimum-to-maximum range across
@@ -343,10 +351,16 @@
                             <tr><th>Agency</th><th>Source</th><th>Filter</th></tr>
                             <tr><td>NIH</td><td><a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a></td><td>Type 1 (new) + Type 2 (competing renewal) extramural grants. Excludes subprojects, intramural research (activity codes starting with Z).</td></tr>
                             <tr><td>NSF</td><td><a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a></td><td>Awards by decision date in CFDA programs 47.041, .049, .050, .070, .074, .075, .076, .083, .084 (R&amp;RA, STEM Education, TIP, Integrative Activities).</td></tr>
-                            <tr><td>DOE</td><td><a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a></td><td>CFDA 81.049, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
+                            <tr><td>DOE</td><td><a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a></td><td>CFDA 81.049, 81.135, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
                             <tr><td>NASA</td><td>USASpending.gov</td><td>CFDA 43.001, 43.013, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
                             <tr><td>USDA</td><td>USASpending.gov</td><td>CFDA 10.310, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
                         </table>
+
+                        <p><strong>Sub-agency detail.</strong> The agency detail view offers sub-agency breakdowns.
+                        NIH data can be filtered by Institute/Center using the IC assignment from NIH Reporter.
+                        NSF data can be filtered by directorate using the CFDA program number (9 directorates).
+                        DOE splits into Office of Science (CFDA 81.049) and ARPA-E (CFDA 81.135).
+                        USDA shows NIFA only (ARS is intramural and not in the awards data).</p>
 
                         <p><strong>Dollar amounts.</strong> NIH dollar amounts are the award amount reported by NIH Reporter.
                         NSF dollar amounts represent the initial-year obligation extracted from the per-year funding breakdown
@@ -355,6 +369,14 @@
                         obligation data and are included in award counts but excluded from dollar totals.
                         USASpending amounts are monthly aggregated obligation dollars. All dollar figures are nominal and
                         not adjusted for inflation.</p>
+
+                        <p><strong>NSF obligation timing.</strong> NSF dollar amounts reflect the full fiscal-year obligation
+                        committed at the time of the award decision. For large cooperative agreements (e.g., research vessel
+                        operations), the committed amount may be substantially larger than the initial transaction recorded
+                        in federal payment systems, with the remainder processed over subsequent months. Year-end totals
+                        converge with USASpending transaction records, but intra-year pace may appear faster in directorate-level
+                        charts, particularly for Geosciences where annual fleet operations contracts can represent a substantial
+                        share of the directorate&rsquo;s total.</p>
 
                         <p><strong>Award counts.</strong> Individual award counts are available for NIH and NSF, which provide
                         award-level records. USASpending reports monthly aggregates, so award counts are not available for
@@ -423,43 +445,49 @@
                         non-competing continuations, renewals, and modifications to existing awards. This captures the full scope of
                         grant funding flowing to the research community in a given fiscal year.
 
-                        <p><strong>Data source.</strong> All five agencies use
-                        <a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a> as a unified data
-                        source, queried through the
-                        <a href="https://api.usaspending.gov/" target="_blank" rel="noopener">spending-over-time API</a>.
-                        This provides consistent methodology across agencies. USASpending reports monthly aggregated obligation
-                        amounts; individual award counts are not available.</p>
+                        <p><strong>Data sources.</strong> NIH uses the
+                        <a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a> with award types
+                        1 (new), 2 (competing renewal), and 5 (non-competing continuation), providing daily award-level records
+                        with individual award counts. NSF, DOE, NASA, and USDA use
+                        <a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a> with the
+                        <code>action_date</code> date type, which captures all grant obligations where the action (new award,
+                        continuation, modification, or renewal) occurred during the fiscal year. USASpending provides monthly
+                        aggregated obligation amounts; individual award counts are not available for these agencies.</p>
 
-                        <p><strong>Date filter.</strong> Queries use the <code>action_date</code> date type, which captures all
-                        grant obligations where the action (new award, continuation, modification, or renewal) occurred during
-                        the fiscal year. This is broader than the <code>new_awards_only</code> filter used for new award tracking,
-                        which captures only initial obligations on newly created award records.</p>
-
-                        <p><strong>Award types.</strong> Queries are filtered to project grants (award type code 04) and
+                        <p><strong>Award types.</strong> USASpending queries are filtered to project grants (award type code 04) and
                         cooperative agreements (award type code 05). Contracts, direct payments, and other non-grant
-                        instruments are excluded.</p>
+                        instruments are excluded. NIH Reporter queries exclude intramural research (activity codes starting with Z)
+                        and subprojects.</p>
 
                         <p><strong>Agency filtering.</strong></p>
                         <table>
-                            <tr><th>Agency</th><th>Filter</th></tr>
-                            <tr><td>NIH</td><td>Awarding subtier agency: National Institutes of Health</td></tr>
-                            <tr><td>NSF</td><td>CFDA 47.041, .049, .050, .070, .074, .075, .076, .083, .084</td></tr>
-                            <tr><td>DOE Office of Science</td><td>CFDA 81.049</td></tr>
-                            <tr><td>NASA Science</td><td>CFDA 43.001, 43.013</td></tr>
-                            <tr><td>USDA (ARS + NIFA)</td><td>CFDA 10.310</td></tr>
+                            <tr><th>Agency</th><th>Source</th><th>Filter</th></tr>
+                            <tr><td>NIH</td><td>NIH Reporter API</td><td>Type 1 + 2 + 5 extramural grants, excl. intramural (activity codes starting with Z)</td></tr>
+                            <tr><td>NSF</td><td>USASpending.gov</td><td>CFDA 47.041, .049, .050, .070, .074, .075, .076, .083, .084</td></tr>
+                            <tr><td>DOE</td><td>USASpending.gov</td><td>CFDA 81.049, 81.135</td></tr>
+                            <tr><td>NASA</td><td>USASpending.gov</td><td>CFDA 43.001, 43.013</td></tr>
+                            <tr><td>USDA</td><td>USASpending.gov</td><td>CFDA 10.310</td></tr>
                         </table>
 
-                        <p><strong>Negative obligations.</strong> Because <code>action_date</code> captures all transaction types,
-                        including deobligations and downward adjustments on existing awards, cumulative totals may briefly go
-                        negative early in a fiscal year when adjustments to prior-year awards precede new obligation activity.
-                        Charts floor these values at zero for readability; the underlying data retains the actual values.</p>
+                        <p><strong>Sub-agency detail.</strong> NIH Reporter data includes Institute/Center (IC) assignment,
+                        enabling sub-agency breakdowns across ~25 ICs. NSF directorate-level breakdowns are available via
+                        per-CFDA queries to USASpending, using the same 9 CFDA programs listed above.
+                        DOE splits into Office of Science (CFDA 81.049) and ARPA-E (CFDA 81.135).
+                        USDA shows NIFA only (ARS is intramural).</p>
+
+                        <p><strong>Negative obligations.</strong> Because USASpending <code>action_date</code> captures all
+                        transaction types, including deobligations and downward adjustments on existing awards, cumulative
+                        totals may briefly go negative early in a fiscal year for some agencies. Charts floor these values
+                        at zero for readability; the underlying data retains the actual values.</p>
 
                         <!-- MAINTENANCE: Update FY ranges below when BAND_YEARS_EXCLUDE changes in config.py -->
                         <p><strong>Historical range.</strong> The shaded band on charts shows the minimum-to-maximum range across
-                        available prior fiscal years; the dashed line shows the average. USASpending coverage begins in different years
-                        by agency: NIH and NSF from FY2016, NASA from FY2017, USDA from FY2018, DOE from FY2019. Years with
-                        incomplete source coverage are automatically excluded. FY2025 and FY2026 are shown as individual lines and
-                        excluded from the historical band.</p>
+                        available prior fiscal years; the dashed line shows the average. NIH all-awards data begins in FY2017;
+                        FY2016 is excluded because Type 5 (non-competing continuation) records are significantly underreported in
+                        NIH Reporter for that year, unlike FY2017 onward which align closely with USASpending totals.
+                        USASpending coverage begins later for some agencies: NASA from FY2017, USDA from FY2018, DOE from FY2019.
+                        Years with incomplete source coverage are automatically excluded. FY2025 and FY2026 are shown as individual
+                        lines and excluded from the historical band.</p>
 
                         <p><strong>Normalization.</strong> Cumulative grant obligation dollars are expressed as a percentage of the
                         discretionary appropriation (SF-133 Line 1100) for the relevant research component. Mandatory appropriation
@@ -468,8 +496,9 @@
                         &ldquo;vs. average pace&rdquo; metric. Agencies whose average appropriation share is below 0.05% at a given
                         point are excluded from the overview chart to avoid noisy ratios from small denominators.</p>
 
-                        <p><strong>Update cadence.</strong> USASpending data is refreshed on a 24-hour cycle for the current
-                        fiscal year. Where the latest reporting period is partial, the final data point is shown provisionally.</p>
+                        <p><strong>Update cadence.</strong> NIH data is fetched from NIH Reporter; caches expire after
+                        24 hours for the current fiscal year. USASpending data is also refreshed on a 24-hour cycle.
+                        Where the latest reporting period is partial, the final data point is shown provisionally.</p>
 
                         <p><strong>Dollar amounts.</strong> All dollar figures are nominal and not adjusted for inflation.</p>
                     </div>
@@ -489,7 +518,7 @@
                         <h3>Glossary</h3>
                         <dl>
                             <dt>Grant Obligation</dt>
-                            <dd>A binding commitment to pay for a grant award, including new awards, continuations, renewals, and modifications. Recorded by USASpending.gov at the transaction level.</dd>
+                            <dd>A binding commitment to pay for a grant award, including new awards, continuations, renewals, and modifications.</dd>
 
                             <dt>Action Date</dt>
                             <dd>The date on which a grant transaction (new award, modification, continuation, or renewal) was executed. Used to assign obligations to fiscal years.</dd>

@@ -111,6 +111,130 @@ HIGHLIGHT_YEARS = [2026, 2025]
 # Years that go into the prior-year range band (excludes current + highlighted)
 BAND_YEARS_EXCLUDE = {2026, 2025}
 
+# ---------------------------------------------------------------------------
+# Sub-Agency Mappings
+# ---------------------------------------------------------------------------
+
+# NIH Institute/Center TRACCT codes (from SF-133 HHS file)
+NIH_IC_TRACCTS = {
+    "NCI": "849", "NHLBI": "872", "NIDCR": "873", "NIDDK": "884",
+    "NINDS": "886", "NIAID": "885", "NIGMS": "851", "NICHD": "844",
+    "NEI": "887", "NIEHS": "862", "NIA": "843", "NIAMS": "888",
+    "NIDCD": "890", "NIMH": "892", "NIDA": "893", "NIAAA": "894",
+    "NINR": "889", "NHGRI": "891", "NIBIB": "898", "NIMHD": "897",
+    "NCCIH": "896", "NCATS": "875", "NLM": "807", "FIC": "819", "OD": "846",
+}
+
+NIH_IC_DISPLAY_NAMES = {
+    "NCI": "National Cancer Institute",
+    "NHLBI": "National Heart, Lung, and Blood Institute",
+    "NIDCR": "National Institute of Dental and Craniofacial Research",
+    "NIDDK": "National Institute of Diabetes and Digestive and Kidney Diseases",
+    "NINDS": "National Institute of Neurological Disorders and Stroke",
+    "NIAID": "National Institute of Allergy and Infectious Diseases",
+    "NIGMS": "National Institute of General Medical Sciences",
+    "NICHD": "Eunice Kennedy Shriver NICHD",
+    "NEI": "National Eye Institute",
+    "NIEHS": "National Institute of Environmental Health Sciences",
+    "NIA": "National Institute on Aging",
+    "NIAMS": "National Institute of Arthritis and Musculoskeletal and Skin Diseases",
+    "NIDCD": "National Institute on Deafness and Other Communication Disorders",
+    "NIMH": "National Institute of Mental Health",
+    "NIDA": "National Institute on Drug Abuse",
+    "NIAAA": "National Institute on Alcohol Abuse and Alcoholism",
+    "NINR": "National Institute of Nursing Research",
+    "NHGRI": "National Human Genome Research Institute",
+    "NIBIB": "National Institute of Biomedical Imaging and Bioengineering",
+    "NIMHD": "National Institute on Minority Health and Health Disparities",
+    "NCCIH": "National Center for Complementary and Integrative Health",
+    "NCATS": "National Center for Advancing Translational Sciences",
+    "NLM": "National Library of Medicine",
+    "FIC": "Fogarty International Center",
+    "OD": "Office of the Director",
+}
+
+# NSF CFDA-to-directorate mapping
+NSF_CFDA_DIRECTORATES = {
+    "47.041": {"key": "NSF_ENG", "name": "Engineering"},
+    "47.049": {"key": "NSF_MPS", "name": "Math & Physical Sciences"},
+    "47.050": {"key": "NSF_GEO", "name": "Geosciences"},
+    "47.070": {"key": "NSF_CISE", "name": "Computer & Information Science"},
+    "47.074": {"key": "NSF_BIO", "name": "Biological Sciences"},
+    "47.075": {"key": "NSF_SBE", "name": "Social, Behavioral & Economic Sciences"},
+    "47.076": {"key": "NSF_EDU_AWD", "name": "STEM Education"},
+    "47.083": {"key": "NSF_IA", "name": "Integrative Activities"},
+    "47.084": {"key": "NSF_TIP", "name": "Technology, Innovation & Partnerships"},
+}
+
+# ---------------------------------------------------------------------------
+# Sub-Agency AGENCIES entries (obligations via SF-133)
+# ---------------------------------------------------------------------------
+
+# DOE sub-agencies
+AGENCIES["DOE_SC_SCI"] = {
+    "display_name": "Office of Science",
+    "sf133_file_key": "doe",
+    "filter_type": "tracct",
+    "filter_value": "222",
+    "color": "#2e8b7a",
+    "parent": "DOE_SC",
+}
+AGENCIES["DOE_ARPA_E"] = {
+    "display_name": "ARPA-E",
+    "sf133_file_key": "doe",
+    "filter_type": "tracct",
+    "filter_value": "337",
+    "color": "#2e8b7a",
+    "parent": "DOE_SC",
+}
+
+# USDA sub-agencies
+AGENCIES["USDA_NIFA"] = {
+    "display_name": "NIFA",
+    "sf133_file_key": "usda",
+    "filter_type": "tracct",
+    "filter_value": "1400",
+    "color": "#8b6dae",
+    "parent": "USDA_RD",
+}
+AGENCIES["USDA_ARS"] = {
+    "display_name": "ARS",
+    "sf133_file_key": "usda",
+    "filter_type": "tracct",
+    "filter_value": ["1500", "1502"],
+    "color": "#8b6dae",
+    "parent": "USDA_RD",
+}
+
+# NSF sub-agencies (obligations only — awards use directorate split)
+AGENCIES["NSF_RRA"] = {
+    "display_name": "Research & Related Activities",
+    "sf133_file_key": "nsf",
+    "filter_type": "tracct",
+    "filter_value": "100",
+    "color": "#d4883a",
+    "parent": "NSF",
+}
+AGENCIES["NSF_EDU"] = {
+    "display_name": "STEM Education",
+    "sf133_file_key": "nsf",
+    "filter_type": "tracct",
+    "filter_value": "106",
+    "color": "#d4883a",
+    "parent": "NSF",
+}
+
+# NIH sub-agencies (per institute)
+for _ic, _tracct in NIH_IC_TRACCTS.items():
+    AGENCIES[f"NIH_{_ic}"] = {
+        "display_name": _ic,
+        "sf133_file_key": "hhs",
+        "filter_type": "tracct",
+        "filter_value": _tracct,
+        "color": "#2c5f8a",
+        "parent": "NIH",
+    }
+
 
 # ---------------------------------------------------------------------------
 # Awards Pipeline
@@ -125,6 +249,10 @@ NIH_REPORTER_PAGE_SIZE = 500
 NIH_REPORTER_MAX_OFFSET = 14999
 NIH_COMPETING_TYPES = ["1", "2"]  # Type 1 (New) + Type 2 (Competing Renewal)
 NIH_ALL_TYPES = ["1", "2", "5"]   # + Type 5 (Non-Competing Continuation)
+# FY2016 Type 5 data from NIH Reporter is significantly lower than USASpending
+# figures for the same year (~$16.5B vs ~$23.5B), unlike FY2017+ which align
+# closely, suggesting a data integrity issue in the earlier Reporter records.
+NIH_ALL_AWARDS_FISCAL_YEARS = list(range(2017, 2027))
 
 # NIH IC abbreviations — used to partition queries and stay under API limits
 NIH_IC_CODES = [
@@ -191,6 +319,60 @@ AWARDS_CONFIG = {
     },
 }
 
+# Sub-agency awards entries
+# DOE sub-agencies (USASpending, per-CFDA)
+AWARDS_CONFIG["DOE_SC_SCI"] = {
+    "source": "usaspending",
+    "metric_label": "New Grant Awards (Office of Science)",
+    "metric_label_short": "Awards",
+    "cfda": ["81.049"],
+    "agency_name": "Department of Energy",
+    "agency_tier": "toptier",
+    "parent": "DOE_SC",
+}
+AWARDS_CONFIG["DOE_ARPA_E"] = {
+    "source": "usaspending",
+    "metric_label": "New Grant Awards (ARPA-E)",
+    "metric_label_short": "Awards",
+    "cfda": ["81.135"],
+    "agency_name": "Department of Energy",
+    "agency_tier": "toptier",
+    "parent": "DOE_SC",
+}
+
+# USDA sub-agency (NIFA only — ARS is intramural, no awards data)
+AWARDS_CONFIG["USDA_NIFA"] = {
+    "source": "usaspending",
+    "metric_label": "New Grant Awards (NIFA)",
+    "metric_label_short": "Awards",
+    "cfda": ["10.310"],
+    "agency_name": "Department of Agriculture",
+    "agency_tier": "toptier",
+    "parent": "USDA_RD",
+}
+
+# NSF directorate sub-agencies (per-CFDA filter on existing NSF Awards data)
+for _cfda, _dir in NSF_CFDA_DIRECTORATES.items():
+    AWARDS_CONFIG[_dir["key"]] = {
+        "source": "nsf_awards",
+        "display_name": _dir["name"],
+        "metric_label": f"New Awards ({_dir['name']})",
+        "metric_label_short": "Awards",
+        "cfda_filter": _cfda,
+        "parent": "NSF",
+    }
+
+# NIH IC sub-agencies (per-IC filter on existing NIH Reporter data)
+for _ic in NIH_IC_TRACCTS:
+    AWARDS_CONFIG[f"NIH_{_ic}"] = {
+        "source": "nih_reporter",
+        "display_name": _ic,
+        "metric_label": f"New & Competing Awards ({_ic})",
+        "metric_label_short": "Awards",
+        "ic_filter": _ic,
+        "parent": "NIH",
+    }
+
 # "All Awards" config — includes continuations and renewals alongside new awards
 ALL_AWARDS_CONFIG = {
     "NIH": {
@@ -199,7 +381,7 @@ ALL_AWARDS_CONFIG = {
         "metric_label_short": "Awards",
     },
     "NSF": {
-        "source": "nsf_awards",
+        "source": "usaspending",
         "metric_label": "All Awards (all directorates)",
         "metric_label_short": "Awards",
     },
@@ -215,4 +397,39 @@ ALL_AWARDS_CONFIG = {
         **AWARDS_CONFIG["USDA_RD"],
         "metric_label": "All Grant Obligations",
     },
+    # DOE sub-agencies
+    "DOE_SC_SCI": {
+        **AWARDS_CONFIG["DOE_SC_SCI"],
+        "metric_label": "All Grant Obligations (Office of Science)",
+    },
+    "DOE_ARPA_E": {
+        **AWARDS_CONFIG["DOE_ARPA_E"],
+        "metric_label": "All Grant Obligations (ARPA-E)",
+    },
+    # USDA sub-agency
+    "USDA_NIFA": {
+        **AWARDS_CONFIG["USDA_NIFA"],
+        "metric_label": "All Grant Obligations (NIFA)",
+    },
 }
+
+# NSF directorate sub-agencies for all-awards (USASpending per-CFDA)
+for _cfda, _dir in NSF_CFDA_DIRECTORATES.items():
+    ALL_AWARDS_CONFIG[_dir["key"]] = {
+        "source": "usaspending",
+        "display_name": _dir["name"],
+        "metric_label": f"All Awards ({_dir['name']})",
+        "metric_label_short": "Awards",
+        "parent": "NSF",
+    }
+
+# NIH IC sub-agencies for all-awards (same ic_filter, different source label)
+for _ic in NIH_IC_TRACCTS:
+    ALL_AWARDS_CONFIG[f"NIH_{_ic}"] = {
+        "source": "nih_reporter",
+        "display_name": _ic,
+        "metric_label": f"All Awards ({_ic})",
+        "metric_label_short": "Awards",
+        "ic_filter": _ic,
+        "parent": "NIH",
+    }

@@ -158,9 +158,9 @@
         ],
         toImageButtonOptions: {
             format: 'png',
-            width: 1200,
-            height: 700,
-            scale: 2,
+            width: 750,
+            height: 500,
+            scale: 2.4,
         },
         responsive: true,
         scrollZoom: false,
@@ -222,6 +222,7 @@
         if (DATA.awards_summary) {
             let minAwardDate = null;
             for (const key of Object.keys(DATA.awards_summary)) {
+                if (DATA.config.agencies[key] && DATA.config.agencies[key].parent) continue;
                 const d = DATA.awards_summary[key].latest_date;
                 if (d && (!minAwardDate || d < minAwardDate)) minAwardDate = d;
             }
@@ -364,8 +365,9 @@
         }
 
         let html = '';
-        // Show agencies that have obligations data (the main 5)
+        // Show parent agencies only (the main 5)
         for (const key of Object.keys(cfg.agencies)) {
+            if (cfg.agencies[key].parent) continue;
             const agency = cfg.agencies[key];
             const oblig = summaries[key];
             const awards = awardsSummary[key];
@@ -749,16 +751,17 @@
             ? 'Cumulative obligations as a percentage of full-year appropriations.'
             : 'Cumulative obligations in billions of dollars by fiscal year month.';
         const mobile = isMobile();
+        const chartName = agencyChartTitle(agencyKey);
         const detailTitle = mobile
-            ? agency.display_name + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>'
-            : agency.display_name + ' \u2014 Obligation Spend-Down'
+            ? chartName + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>'
+            : chartName + ' \u2014 Obligation Spend-Down'
             + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + detailSubtitle + '</span>';
         const annotations = compact ? [] : [sourceAnnotation("Source: OMB SF-133")].filter(Boolean);
         if (!compact) annotations.push(...obligationMonthLabels(false));
 
         const layout = {
             title: compact ? {
-                text: agency.display_name,
+                text: chartName,
                 font: { family: FONT_SERIF, size: 13, weight: 600, color: TEXT_COLOR },
                 x: 0.02,
                 xanchor: 'left',
@@ -843,6 +846,7 @@
         heading.textContent = 'Individual Agency Trends \u2014 Obligations';
 
         for (const key of Object.keys(cfg.agencies)) {
+            if (cfg.agencies[key].parent) continue;
             if (!DATA.spenddown[key]) continue;
 
             const card = document.createElement('div');
@@ -939,8 +943,8 @@
     // ── Agency Detail (within Obligations tab) ──
 
     function renderAgencyDetail() {
-        const select = document.getElementById('agency-select');
-        const agencyKey = select.value;
+        const subSelect = document.getElementById('agency-sub-select');
+        const agencyKey = getSelectedAgency(subSelect);
         const mode = getActiveMode('obligations-view-mode');
         const showPct = mode === 'pct';
 
@@ -948,19 +952,84 @@
         renderSpenddownChart(agencyKey, 'chart-agency-detail', showPct, false);
     }
 
-    function initAgencySelect() {
-        const select = document.getElementById('agency-select');
+    // Two-dropdown agency selection: primary dropdown for parent agency,
+    // secondary dropdown for sub-agency (defaults to topline combined view).
+    // dataKey is the DATA property to check for data (e.g., 'spenddown', 'awards').
+    function populateAgencyDropdown(agencySelect, subSelect, dataKey, onChange) {
         const cfg = DATA.config;
+        const dataObj = DATA[dataKey];
+        agencySelect.innerHTML = '';
 
-        for (const key of Object.keys(cfg.agencies)) {
-            if (!DATA.spenddown[key]) continue;
-            const opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = cfg.agencies[key].display_name;
-            select.appendChild(opt);
+        // Strip parentheticals from display names for the primary dropdown
+        function shortName(name) {
+            return name.replace(/\s*\(.*\)\s*$/, '').trim();
         }
 
-        select.addEventListener('change', renderAgencyDetail);
+        // Populate parent agencies (short names, no parentheticals)
+        for (const key of Object.keys(cfg.agencies)) {
+            if (cfg.agencies[key].parent) continue;
+            if (!dataObj || !dataObj[key]) continue;
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = shortName(cfg.agencies[key].display_name);
+            agencySelect.appendChild(opt);
+        }
+
+        function updateSubSelect() {
+            const parentKey = agencySelect.value;
+            const parentName = cfg.agencies[parentKey].display_name;
+            subSelect.innerHTML = '';
+
+            // Sub-agencies for this parent, sorted alphabetically
+            const subs = Object.keys(cfg.agencies).filter(k =>
+                cfg.agencies[k].parent === parentKey && dataObj[k]
+            ).sort((a, b) => cfg.agencies[a].display_name.localeCompare(cfg.agencies[b].display_name));
+
+            // Default: topline combined view (use full name with parenthetical)
+            const topOpt = document.createElement('option');
+            topOpt.value = parentKey;
+            // If has sub-agencies, show the parenthetical version for clarity
+            var parenMatch = parentName.match(/\((.+)\)/);
+            topOpt.textContent = parenMatch ? parenMatch[1] : parentName;
+            subSelect.appendChild(topOpt);
+
+            for (const subKey of subs) {
+                const opt = document.createElement('option');
+                opt.value = subKey;
+                opt.textContent = cfg.agencies[subKey].display_name;
+                subSelect.appendChild(opt);
+            }
+            subSelect.style.display = '';
+
+            if (onChange) onChange();
+        }
+
+        agencySelect.addEventListener('change', updateSubSelect);
+        subSelect.addEventListener('change', function() { if (onChange) onChange(); });
+        updateSubSelect();
+    }
+
+    // Get the effective agency key from a two-dropdown setup
+    function getSelectedAgency(subSelect) {
+        return subSelect.value;
+    }
+
+    // Full display name for chart titles: "NIH — NCI" for sub-agencies, "NIH" for parents
+    function agencyChartTitle(agencyKey) {
+        const cfg = DATA.config.agencies[agencyKey];
+        if (!cfg) return agencyKey;
+        if (cfg.parent) {
+            const parentCfg = DATA.config.agencies[cfg.parent];
+            const parentShort = parentCfg.display_name.replace(/\s*\(.*\)\s*$/, '').trim();
+            return parentShort + ' — ' + cfg.display_name;
+        }
+        return cfg.display_name;
+    }
+
+    function initAgencySelect() {
+        const select = document.getElementById('agency-select');
+        const subSelect = document.getElementById('agency-sub-select');
+        populateAgencyDropdown(select, subSelect, 'spenddown', renderAgencyDetail);
         initSegmentedControl('obligations-view-mode', function() { renderAgencyDetail(); });
     }
 
@@ -971,9 +1040,9 @@
             const agencyKey = document.getElementById('agency-select').value;
             Plotly.downloadImage(document.getElementById('chart-agency-detail'), {
                 format: 'png',
-                width: 1200,
-                height: 600,
-                scale: 2,
+                width: 750,
+                height: 500,
+                scale: 2.4,
                 filename: agencyKey + '_spenddown',
             });
         });
@@ -1005,9 +1074,9 @@
             const agencyKey = document.getElementById('awards-agency-select').value;
             Plotly.downloadImage(document.getElementById('chart-awards-detail'), {
                 format: 'png',
-                width: 1200,
-                height: 600,
-                scale: 2,
+                width: 750,
+                height: 500,
+                scale: 2.4,
                 filename: agencyKey + '_awards',
             });
         });
@@ -1374,7 +1443,7 @@
     // axis format hover headers as month names automatically.
     function fyDayToRefDate(day) {
         const d = new Date(Date.UTC(2000, 9, 1)); // Oct 1, 2000
-        d.setUTCDate(d.getUTCDate() + day - 1);
+        d.setUTCDate(d.getUTCDate() + Math.min(day, 365) - 1);
         return d.toISOString().slice(0, 10);
     }
 
@@ -1413,6 +1482,7 @@
         });
 
         for (const agencyKey of Object.keys(awards)) {
+            if (cfg.agencies[agencyKey] && cfg.agencies[agencyKey].parent) continue;
             const agencyAwards = awards[agencyKey];
             const agencyCfg = cfg.agencies[agencyKey];
             if (!agencyCfg) continue;
@@ -1781,14 +1851,15 @@
             : isDollars ? 'Cumulative ' + awardTypeLabel + ' dollars over the fiscal year.'
             : 'Cumulative grant dollars as a percentage of the full-year appropriation.';
         const mobileAwd = isMobile();
+        const awardsChartName = agencyChartTitle(agencyKey);
         const awardsDetailTitle = mobileAwd
-            ? agencyCfg.display_name + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
-            : agencyCfg.display_name + ' \u2014 ' + (overrideAwards ? 'All Awards' : 'New Awards')
+            ? awardsChartName + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>'
+            : awardsChartName + ' \u2014 ' + (overrideAwards ? 'All Awards' : 'New Awards')
             + '<br><span style="font-size:11px;font-weight:400;color:#606060;font-family:' + FONT_SANS + '">' + awardsDetailSubtitle + '</span>';
 
         const layout = {
             title: compact ? {
-                text: agencyCfg.display_name,
+                text: awardsChartName,
                 font: { family: FONT_SERIF, size: 13, weight: 600, color: TEXT_COLOR },
                 x: 0.02,
                 xanchor: 'left',
@@ -1857,6 +1928,7 @@
 
         for (const key of Object.keys(awards)) {
             if (!DATA.config.agencies[key]) continue;
+            if (DATA.config.agencies[key].parent) continue;
 
             const card = document.createElement('div');
             card.className = 'chart-card';
@@ -1982,23 +2054,31 @@
         const awards = DATA.awards;
         if (!awards) return;
 
-        const select = document.getElementById('awards-agency-select');
-        const agencyKey = select.value;
+        const subSelect = document.getElementById('awards-sub-select');
+        const agencyKey = getSelectedAgency(subSelect);
         const agencyAwards = awards[agencyKey];
+        if (!agencyAwards) return;
 
-        // Only NIH/NSF have meaningful counts
-        const hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';
+        // Check data availability
+        const hasCounts = agencyAwards.source_type !== 'usaspending';
+        const hasPct = agencyAwards.envelope_pct != null;
         const mode = getActiveMode('awards-view-mode');
 
-        // Disable/enable counts button based on agency
+        // Disable/enable buttons based on data availability
         const countsBtn = document.querySelector('#awards-view-mode .seg-btn[data-mode="counts"]');
         if (countsBtn) {
             countsBtn.disabled = !hasCounts;
             countsBtn.style.display = hasCounts ? '' : 'none';
         }
+        const pctBtn = document.querySelector('#awards-view-mode .seg-btn[data-mode="pct"]');
+        if (pctBtn) {
+            pctBtn.disabled = !hasPct;
+        }
 
-        // If counts is selected but not available, fallback to pct
-        const effectiveMode = (mode === 'counts' && !hasCounts) ? 'pct' : mode;
+        // Fallback mode if current selection isn't available
+        let effectiveMode = mode;
+        if (effectiveMode === 'counts' && !hasCounts) effectiveMode = hasPct ? 'pct' : 'dollars';
+        if (effectiveMode === 'pct' && !hasPct) effectiveMode = 'dollars';
 
         renderAwardsMetrics(agencyKey);
         renderAwardsCumulativeChart(agencyKey, 'chart-awards-detail', effectiveMode, false);
@@ -2022,28 +2102,8 @@
         }
 
         const select = document.getElementById('awards-agency-select');
-        for (const key of Object.keys(awards)) {
-            const agencyCfg = DATA.config.agencies[key];
-            if (!agencyCfg) continue;
-            const opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = agencyCfg.display_name;
-            select.appendChild(opt);
-        }
-
-        select.addEventListener('change', () => {
-            // Reset to pct when switching agencies (counts may not be available)
-            const agencyAwards = awards[select.value];
-            const hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';
-            if (!hasCounts && getActiveMode('awards-view-mode') === 'counts') {
-                const pctBtn = document.querySelector('#awards-view-mode .seg-btn[data-mode="pct"]');
-                if (pctBtn) {
-                    document.querySelectorAll('#awards-view-mode .seg-btn').forEach(b => b.classList.remove('active'));
-                    pctBtn.classList.add('active');
-                }
-            }
-            renderAwardsDetail();
-        });
+        const subSelect = document.getElementById('awards-sub-select');
+        populateAgencyDropdown(select, subSelect, 'awards', renderAwardsDetail);
         initSegmentedControl('awards-view-mode', function() { renderAwardsDetail(); });
 
         renderAwardsMultiChart();
@@ -2337,13 +2397,14 @@
         var yAxisLabel = isPct ? '% of Appropriation Awarded' : 'Cumulative Awards ($M)';
         var annotations = compact ? [] : [sourceAnnotation('Source: USASpending.gov')].filter(Boolean);
 
+        var unifiedChartName = agencyChartTitle(agencyKey);
         var layout = {
             title: compact ? {
-                text: agencyCfg.display_name,
+                text: unifiedChartName,
                 font: { family: FONT_SERIF, size: 13, weight: 600, color: TEXT_COLOR },
                 x: 0.02, xanchor: 'left',
             } : {
-                text: agencyCfg.display_name + ' \u2014 USASpending',
+                text: unifiedChartName + ' \u2014 USASpending',
                 font: { family: FONT_SERIF, size: isMobile() ? 14 : 16, weight: 600, color: TEXT_COLOR },
                 x: 0.01, xanchor: 'left',
             },
@@ -2433,23 +2494,22 @@
 
         // Populate agency select
         var select = document.getElementById('awards-all-agency-select');
+        var subSelect = document.getElementById('awards-all-sub-select');
         if (!select) return;
-        select.innerHTML = '';
-        for (var key of Object.keys(awards)) {
-            var opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = DATA.config.agencies[key].display_name;
-            select.appendChild(opt);
-        }
-
-        select.addEventListener('change', renderAllAwardsDetail);
+        populateAgencyDropdown(select, subSelect, 'awards_all', renderAllAwardsDetail);
         initSegmentedControl('awards-all-view-mode', renderAllAwardsDetail);
 
         // Export
         var pngBtn = document.getElementById('btn-awards-all-download-png');
         var csvBtn = document.getElementById('btn-awards-all-download-csv');
         if (pngBtn) pngBtn.addEventListener('click', function() {
-            exportChartAsPng('chart-awards-all-detail', select.value + '_all_awards');
+            Plotly.downloadImage(document.getElementById('chart-awards-all-detail'), {
+                format: 'png',
+                width: 750,
+                height: 500,
+                scale: 2.4,
+                filename: select.value + '_all_awards',
+            });
         });
         if (csvBtn) csvBtn.addEventListener('click', function() {
             var agencyKey = select.value;
@@ -2471,6 +2531,7 @@
         var container = document.getElementById('awards-all-small-multiples');
         container.innerHTML = '';
         for (var key of Object.keys(awards)) {
+            if (DATA.config.agencies[key] && DATA.config.agencies[key].parent) continue;
             var div = document.createElement('div');
             div.className = 'chart-card';
             div.innerHTML = '<div id="chart-awards-all-mini-' + key + '"></div>';
@@ -2483,8 +2544,8 @@
         var awards = DATA.awards_all;
         if (!awards) return;
 
-        var select = document.getElementById('awards-all-agency-select');
-        var agencyKey = select.value;
+        var subSelect = document.getElementById('awards-all-sub-select');
+        var agencyKey = getSelectedAgency(subSelect);
         var agencyAwards = awards[agencyKey];
 
         var hasCounts = agencyAwards && agencyAwards.source_type !== 'usaspending';

@@ -70,6 +70,18 @@ def _build_daily_cumulative(df: pd.DataFrame, agency_key: str) -> pd.DataFrame:
                 "is_provisional": False,
             })
 
+        # For completed FYs, extend to end of FY so lines don't stop short
+        if int(fy) < CURRENT_FY and records:
+            last = records[-1]
+            fy_end = date(int(fy), 9, 30)
+            last_date = date.fromisoformat(last["date"])
+            if last_date < fy_end:
+                records.append({
+                    **last,
+                    "date": fy_end.isoformat(),
+                    "fy_day": _fy_day(fy_end, int(fy)),
+                })
+
     return pd.DataFrame(records)
 
 
@@ -202,7 +214,21 @@ def build_award_series(
     for agency_key, df in raw_data.items():
         if df.empty:
             continue
-        source = AWARDS_CONFIG[agency_key]["source"]
+        cfg = AWARDS_CONFIG[agency_key]
+        source = cfg["source"]
+
+        # Pre-filter for sub-agency keys
+        if "ic_filter" in cfg and "ic_code" in df.columns:
+            df = df[df["ic_code"] == cfg["ic_filter"]].copy()
+            df["agency"] = agency_key
+        elif "cfda_filter" in cfg and "cfda_number" in df.columns:
+            target_cfda = cfg["cfda_filter"]
+            df = df[df["cfda_number"].str.split(",").str[0].str.strip() == target_cfda].copy()
+            df["agency"] = agency_key
+
+        if df.empty:
+            continue
+
         if source in ("nih_reporter", "nsf_awards"):
             frames.append(_build_daily_cumulative(df, agency_key))
         elif source == "usaspending":

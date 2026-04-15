@@ -13,6 +13,9 @@ import pandas as pd
 
 from config import AGENCIES, AMOUNT_COLUMNS, TARGET_LINES
 
+# Cache parsed Excel DataFrames to avoid re-reading the same file for sub-agencies
+_excel_cache: dict[str, pd.DataFrame] = {}
+
 # Column indices in the Raw Data sheet (0-based)
 COL_MAP = {
     "RPT_YR": 0,
@@ -90,28 +93,34 @@ def parse_file(filepath: Path, agency_key: str) -> pd.DataFrame | None:
     if not filepath.exists():
         return None
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            # Try reading with pandas for speed; fall back to openpyxl if needed
-            df_raw = pd.read_excel(
-                filepath,
-                sheet_name="Raw Data",
-                engine="openpyxl",
-            )
-        except Exception as e:
-            print(f"  Warning: could not read {filepath.name}: {e}")
+    cache_key = str(filepath)
+    if cache_key in _excel_cache:
+        df_raw = _excel_cache[cache_key].copy()
+    else:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                df_raw = pd.read_excel(
+                    filepath,
+                    sheet_name="Raw Data",
+                    engine="openpyxl",
+                )
+            except Exception as e:
+                print(f"  Warning: could not read {filepath.name}: {e}")
+                return None
+
+        if df_raw.empty:
             return None
 
-    if df_raw.empty:
-        return None
+        # Normalize column names (strip whitespace)
+        df_raw.columns = [str(c).strip() for c in df_raw.columns]
 
-    # Normalize column names (strip whitespace)
-    df_raw.columns = [str(c).strip() for c in df_raw.columns]
+        # Filter to unexpired accounts
+        if "STAT" in df_raw.columns:
+            df_raw = df_raw[df_raw["STAT"].astype(str).str.strip() == "U"]
 
-    # Filter to unexpired accounts
-    if "STAT" in df_raw.columns:
-        df_raw = df_raw[df_raw["STAT"].astype(str).str.strip() == "U"]
+        _excel_cache[cache_key] = df_raw
+        df_raw = df_raw.copy()
 
     # Apply agency-specific filter
     mask = df_raw.apply(

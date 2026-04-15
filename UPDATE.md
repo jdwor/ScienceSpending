@@ -17,13 +17,17 @@
 
 ### Step 1: Update awards data
 
-Awards caches auto-expire after 24 hours for the current FY, so this always fetches fresh data:
+Awards caches auto-expire after 24 hours for the current FY, so this always fetches fresh data.
+
+**Important:** Always run these with no flags. The `--agencies` and `--years` flags overwrite the full output CSVs, destroying data for unselected agencies/years. Caching makes the full run fast anyway.
 
 ```bash
+# New awards (NIH Reporter types 1+2, NSF Awards API, USASpending)
 python3 -m awards.preprocess
-```
 
-Flags: `--force` busts all caches, `--years 2026` limits to specific FYs, `--agencies NIH NSF` limits to specific agencies.
+# All awards (NIH Reporter types 1+2+5, USASpending for NSF/DOE/NASA/USDA)
+python3 -m awards.preprocess_all
+```
 
 ### Step 2: Check for new SF-133 obligations data
 
@@ -58,7 +62,7 @@ Outputs `docs/data/site_data.json`. The build script prints the latest period an
 
 - Check the build output for the latest period label (e.g., "Latest period: Feb")
 - Open `docs/index.html` in a browser and confirm charts render correctly
-- Spot-check metric cards for reasonable values
+- Spot-check summary tables for reasonable values
 - If committing, `git diff docs/data/site_data.json` to review what changed
 
 ---
@@ -86,12 +90,16 @@ The same Excel files are updated in place by OMB each month — new monthly colu
 
 | Item | Detail |
 |------|--------|
-| Source | NIH Reporter — competing awards |
+| Source | NIH Reporter — extramural awards |
 | URL | `https://api.reporter.nih.gov/v2/projects/search` |
-| Filter | Type 1 (new) + Type 2 (competing renewal), excluding subprojects |
-| Partitioning | By IC code (24 institutes) to stay under 15k-record API limit |
+| New Awards | Type 1 (new) + Type 2 (competing renewal), excluding subprojects and intramural (Z codes) |
+| All Awards | Type 1 + Type 2 + Type 5 (non-competing continuation) |
+| Partitioning | By IC code (~25 institutes) to stay under 15k-record API limit |
 | Rate limit | 1 request/second |
-| Cache | `awards/cache/nih/fy{year}_{ic}.json` — current FY expires after 24h |
+| Cache (new) | `awards/cache/nih/fy{year}_{ic}.json` — current FY expires after 24h |
+| Cache (all) | `awards/cache/nih_all/fy{year}_{ic}.json` — separate cache for types 1+2+5 |
+
+**Note:** FY2016 is excluded from the all-awards pipeline (`NIH_ALL_AWARDS_FISCAL_YEARS` in config.py) because Type 5 records are significantly underreported for that year in NIH Reporter.
 
 ### NSF Awards API (daily)
 
@@ -99,9 +107,10 @@ The same Excel files are updated in place by OMB each month — new monthly colu
 |------|--------|
 | Source | NSF Awards Search |
 | URL | `https://api.nsf.gov/services/v1/awards.json` |
-| Filter | Research & Related CFDAs (47.041, .049, .050, .070, .074, .075) |
+| Filter | CFDAs 47.041, .049, .050, .070, .074, .075, .076, .083, .084 |
 | Partitioning | By calendar month to stay under 3k-result limit |
 | Cache | `awards/cache/nsf/fy{year}_d{yearmonth}.json` — current FY expires after 24h |
+| Used for | New Awards tab only. All Awards tab uses USASpending for NSF. |
 
 ### USASpending API (monthly)
 
@@ -109,10 +118,31 @@ The same Excel files are updated in place by OMB each month — new monthly colu
 |------|--------|
 | Source | USASpending.gov — spending over time |
 | URL | `https://api.usaspending.gov/api/v2/search/spending_over_time/` |
-| Agencies | DOE Office of Science, NASA Science, USDA (ARS + NIFA) |
-| Filter | Award types 04 (project grants) + 05 (cooperative agreements), `new_awards_only` |
-| CFDA codes | DOE: 81.049, NASA: 43.001/43.013, USDA: 10.310 |
-| Cache | `awards/cache/usaspending/{agency}_fy{year}.json` — current FY expires after 24h |
+| Award types | 04 (project grants) + 05 (cooperative agreements) |
+
+**New awards** (`new_awards_only` filter):
+
+| Agency | CFDAs |
+|--------|-------|
+| DOE (Office of Science + ARPA-E) | 81.049, 81.135 |
+| NASA Science | 43.001, 43.013 |
+| USDA (ARS + NIFA) | 10.310 |
+
+Cache: `awards/cache/usaspending/{agency}_fy{year}.json`
+
+**All awards** (`action_date` filter — captures continuations, modifications, renewals):
+
+| Agency | CFDAs |
+|--------|-------|
+| NSF (topline) | 47.041, .049, .050, .070, .074, .075, .076, .083, .084 |
+| NSF directorates | Individual CFDAs (e.g., NSF_ENG = 47.041, NSF_EDU_AWD = 47.076) |
+| DOE (Office of Science + ARPA-E) | 81.049, 81.135 |
+| DOE sub-agencies | DOE_SC_SCI = 81.049, DOE_ARPA_E = 81.135 |
+| NASA Science | 43.001, 43.013 |
+| USDA (ARS + NIFA) | 10.310 |
+| USDA sub-agency | USDA_NIFA = 10.310 |
+
+Cache: `awards/cache/usaspending_all/{agency}_fy{year}.json`
 
 ---
 
@@ -126,6 +156,7 @@ When a new fiscal year begins (October 1):
 CURRENT_FY = 2027                    # was 2026
 FISCAL_YEARS = list(range(2016, 2028))        # extend by 1
 AWARDS_FISCAL_YEARS = list(range(2016, 2028)) # extend by 1
+NIH_ALL_AWARDS_FISCAL_YEARS = list(range(2017, 2028))  # extend by 1 (starts FY2017)
 HIGHLIGHT_YEARS = [2027, 2026]                # shift forward
 BAND_YEARS_EXCLUDE = {2027, 2026}             # shift forward
 ```
@@ -153,6 +184,7 @@ Add a new entry for the new FY. The attachment ID and filenames must be obtained
 python3 data/download.py --years 2027
 python3 data/preprocess.py
 python3 -m awards.preprocess
+python3 -m awards.preprocess_all
 python3 build.py
 ```
 
@@ -164,7 +196,7 @@ Search for `MAINTENANCE: Update FY range` comments in the HTML. Update the hardc
 
 - New FY appears as highlighted line on charts
 - Previous FY moves from highlighted to band-year
-- Metric cards show new FY values
+- Summary tables show new FY values
 - Historical envelope band now includes the prior-prior year
 - Methodology text shows correct FY range for historical band
 
@@ -175,9 +207,10 @@ Search for `MAINTENANCE: Update FY range` comments in the HTML. Update the hardc
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | `download.py` returns 403/404 | Attachment ID changed on MAX portal | Find new ID on portal page, update `file_registry.json` |
-| Awards API timeout | Transient network issue | Retry; use `--force` to bust cache |
+| Awards API timeout | Transient network issue | Retry; pipeline uses caching so partial progress is saved |
 | Missing months in charts | SF-133 file doesn't have that period yet | Wait for OMB to publish; check with `--check` |
 | Appropriation shows 0 during CR | Normal — Line 1100 is 0 under Continuing Resolution | No fix needed; values correct once full-year bill enacted |
 | `openpyxl` error reading Excel | Corrupt download | Delete cached file, re-download with `--force` |
 | Awards data empty for agency | API changed or CFDA codes updated | Check API directly; verify CFDA codes in `config.py` |
 | Build fails on missing CSV | Preprocess step was skipped | Run `python3 data/preprocess.py` and/or `python3 -m awards.preprocess` first |
+| Need to refresh one agency's cache | Stale or corrupt cache for specific agency | Delete that agency's cache files (e.g., `rm awards/cache/nih/fy2026_*.json`), then rerun pipeline |
