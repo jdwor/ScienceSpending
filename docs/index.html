@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Track federal science spending at NIH, NSF, DOE, NASA, and USDA. Monitors obligation rates and new award activity against historical averages using official budget data.">
     <title>Tracking Science Spending</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="preload" href="data/site_data.json" as="fetch" crossorigin>
     <!-- Privacy-friendly analytics by Plausible -->
     <script async src="https://plausible.io/js/pa-NcrzP6OiMtx9ancGkuYxm.js"></script>
     <script>
@@ -17,6 +19,7 @@
     </script>
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
     <div class="site-wrapper">
         <!-- Header -->
         <header class="site-header">
@@ -40,7 +43,7 @@
         </nav>
 
         <!-- Main Content -->
-        <main class="container">
+        <main class="container" id="main-content">
             <!-- Overview Tab -->
             <section id="tab-overview" class="tab-panel active" role="tabpanel">
                 <div class="intro-text">
@@ -88,8 +91,8 @@
                 <div class="section-heading-inline">
                     <h2 class="section-heading">Agency Detail:</h2>
                     <div class="select-wrapper select-inline">
-                        <select id="agency-select"></select>
-                        <select id="agency-sub-select"></select>
+                        <select id="agency-select" aria-label="Select agency"></select>
+                        <select id="agency-sub-select" aria-label="Select sub-agency"></select>
                     </div>
                 </div>
                 <p class="section-subheading">Summary metrics and a detailed spend-down chart for the selected agency, with current-year data plotted against the historical range.</p>
@@ -149,8 +152,8 @@
                 <div class="section-heading-inline">
                     <h2 class="section-heading">Agency Detail:</h2>
                     <div class="select-wrapper select-inline">
-                        <select id="awards-agency-select"></select>
-                        <select id="awards-sub-select"></select>
+                        <select id="awards-agency-select" aria-label="Select agency"></select>
+                        <select id="awards-sub-select" aria-label="Select sub-agency"></select>
                     </div>
                 </div>
                 <p class="section-subheading">Summary metrics and a cumulative award chart for the selected agency, with current-year data plotted against the historical range.</p>
@@ -212,8 +215,8 @@
                 <div class="section-heading-inline">
                     <h2 class="section-heading">Agency Detail:</h2>
                     <div class="select-wrapper select-inline">
-                        <select id="awards-all-agency-select"></select>
-                        <select id="awards-all-sub-select"></select>
+                        <select id="awards-all-agency-select" aria-label="Select agency"></select>
+                        <select id="awards-all-sub-select" aria-label="Select sub-agency"></select>
                     </div>
                 </div>
                 <p class="section-subheading">Summary metrics and a cumulative chart for the selected agency, including all award types.</p>
@@ -244,7 +247,7 @@
             <section id="tab-data" class="tab-panel" role="tabpanel">
                 <div class="data-view-switcher">
                     <div class="select-wrapper select-inline">
-                        <select id="data-section-select">
+                        <select id="data-section-select" aria-label="Select data section">
                             <option value="obligations">Obligations</option>
                             <option value="awards">New Awards</option>
                             <option value="awards-all">All Awards</option>
@@ -279,7 +282,7 @@
                         <p><strong>Agency filtering.</strong> Each tracked agency corresponds to specific Treasury Account Fund Symbols (TAFS)
                         or bureau codes within department-level SF-133 files:</p>
                         <table>
-                            <tr><th>Agency</th><th>SF-133 Filter</th><th>Scope</th></tr>
+                            <tr><th scope="col">Agency</th><th scope="col">SF-133 Filter</th><th scope="col">Scope</th></tr>
                             <tr><td>NIH</td><td>Bureau: &ldquo;National Institutes of Health,&rdquo; excl. TRACCTs 3966, 4554, 838</td><td>Research institutes &amp; OD (excl. Management Fund, Services &amp; Supply, Buildings)</td></tr>
                             <tr><td>NSF</td><td>TRACCTs 100, 106</td><td>Research &amp; Related Activities + STEM Education. TIP is budgeted within R&amp;RA. H-1B fee-funded accounts (TRACCT 5176) are excluded because they have no corresponding appropriation on Lines 1100/1200.</td></tr>
                             <tr><td>DOE</td><td>TRACCTs 222, 337</td><td>Office of Science + ARPA-E</td></tr>
@@ -348,7 +351,7 @@
 
                         <p><strong>Agency filtering.</strong></p>
                         <table>
-                            <tr><th>Agency</th><th>Source</th><th>Filter</th></tr>
+                            <tr><th scope="col">Agency</th><th scope="col">Source</th><th scope="col">Filter</th></tr>
                             <tr><td>NIH</td><td><a href="https://reporter.nih.gov/" target="_blank" rel="noopener">NIH Reporter API</a></td><td>Type 1 (new) + Type 2 (competing renewal) extramural grants. Excludes subprojects, intramural research (activity codes starting with Z).</td></tr>
                             <tr><td>NSF</td><td><a href="https://www.nsf.gov/awardsearch/" target="_blank" rel="noopener">NSF Awards API</a></td><td>Awards by decision date in CFDA programs 47.041, .049, .050, .070, .074, .075, .076, .083, .084 (R&amp;RA, STEM Education, TIP, Integrative Activities).</td></tr>
                             <tr><td>DOE</td><td><a href="https://www.usaspending.gov/" target="_blank" rel="noopener">USASpending.gov</a></td><td>CFDA 81.049, 81.135, award types 04/05, <code>new_awards_only</code> filter.</td></tr>
@@ -461,7 +464,7 @@
 
                         <p><strong>Agency filtering.</strong></p>
                         <table>
-                            <tr><th>Agency</th><th>Source</th><th>Filter</th></tr>
+                            <tr><th scope="col">Agency</th><th scope="col">Source</th><th scope="col">Filter</th></tr>
                             <tr><td>NIH</td><td>NIH Reporter API</td><td>Type 1 + 2 + 5 extramural grants, excl. intramural (activity codes starting with Z)</td></tr>
                             <tr><td>NSF</td><td>USASpending.gov</td><td>CFDA 47.041, .049, .050, .070, .074, .075, .076, .083, .084</td></tr>
                             <tr><td>DOE</td><td>USASpending.gov</td><td>CFDA 81.049, 81.135</td></tr>
@@ -565,7 +568,7 @@
                 <div class="section-heading-inline">
                     <h2 class="section-heading">Agency Detail:</h2>
                     <div class="select-wrapper select-inline">
-                        <select id="unified-agency-select"></select>
+                        <select id="unified-agency-select" aria-label="Select agency"></select>
                     </div>
                 </div>
                 <p class="section-subheading">Summary metrics and cumulative chart using USASpending as the data source.</p>
@@ -596,6 +599,7 @@
         </footer>
     </div>
 
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

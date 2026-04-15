@@ -259,16 +259,19 @@
         const panels = document.querySelectorAll('.tab-panel');
 
         const renderedTabs = new Set();
-        function activateTab(tabName) {
+        function activateTab(tabName, focusBtn) {
             const btn = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
             if (!btn) return;
             btns.forEach(b => {
                 b.classList.remove('active');
                 b.setAttribute('aria-selected', 'false');
+                b.setAttribute('tabindex', '-1');
             });
             panels.forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
             btn.setAttribute('aria-selected', 'true');
+            btn.setAttribute('tabindex', '0');
+            if (focusBtn) btn.focus();
             document.getElementById('tab-' + tabName).classList.add('active');
             if (!renderedTabs.has(tabName)) {
                 renderedTabs.add(tabName);
@@ -279,6 +282,7 @@
                     if (tabName === 'awards') initAwardsTab();
                     if (tabName === 'awards-all') initAllAwardsTab();
                     if (tabName === 'unified') initUnifiedTab();
+                    if (tabName === 'data') { renderTables(); renderAwardsSeriesTable(); renderAllAwardsSeriesTable(); }
                 }, 10);
             }
             setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
@@ -289,12 +293,34 @@
         const hashToTab = {};
         for (const k in tabToHash) hashToTab[tabToHash[k]] = k;
 
+        // Initialize roving tabindex — only active tab is in tab order
+        btns.forEach(btn => {
+            btn.setAttribute('tabindex', btn.classList.contains('active') ? '0' : '-1');
+        });
+
         btns.forEach(btn => {
             btn.addEventListener('click', () => {
                 activateTab(btn.dataset.tab);
                 history.replaceState(null, '', '#' + (tabToHash[btn.dataset.tab] || btn.dataset.tab));
             });
         });
+
+        // Arrow key navigation for roving tabindex
+        const tablist = document.querySelector('[role="tablist"]');
+        if (tablist) {
+            tablist.addEventListener('keydown', function (e) {
+                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                var visibleBtns = Array.from(btns).filter(function (b) { return b.offsetParent !== null; });
+                var idx = visibleBtns.indexOf(document.activeElement);
+                if (idx < 0) return;
+                if (e.key === 'ArrowRight') idx = (idx + 1) % visibleBtns.length;
+                if (e.key === 'ArrowLeft') idx = (idx - 1 + visibleBtns.length) % visibleBtns.length;
+                var nextTab = visibleBtns[idx].dataset.tab;
+                activateTab(nextTab, true);
+                history.replaceState(null, '', '#' + (tabToHash[nextTab] || nextTab));
+                e.preventDefault();
+            });
+        }
 
         // Activate tab from URL hash on load
         const hash = location.hash.replace('#', '');
@@ -395,7 +421,7 @@
             }
 
             html += '<div class="overview-card" data-agency="' + key + '" style="border-top-color: ' + agency.color + ';">';
-            html += '<div class="overview-card-header">';
+            html += '<div class="overview-card-header" role="button" tabindex="0" aria-expanded="false" aria-label="' + agency.display_name + ' details">';
             html += '<div class="overview-card-name">' + agency.display_name + '<span class="overview-chevron">&#x25BE;</span></div>';
 
             // Collapsed metrics (hidden when expanded)
@@ -461,47 +487,59 @@
             });
         }
 
-        allCards.forEach(card => {
-            card.querySelector('.overview-card-header').addEventListener('click', () => {
-                const agencyKey = card.dataset.agency;
-                const wasExpanded = card.classList.contains('expanded');
+        function toggleCard(card) {
+            const agencyKey = card.dataset.agency;
+            const wasExpanded = card.classList.contains('expanded');
+            const header = card.querySelector('.overview-card-header');
 
-                // Collapse all cards
-                container.querySelectorAll('.overview-card.expanded').forEach(c => {
-                    c.classList.remove('expanded');
-                });
+            // Collapse all cards and reset aria-expanded
+            container.querySelectorAll('.overview-card.expanded').forEach(c => {
+                c.classList.remove('expanded');
+                c.querySelector('.overview-card-header').setAttribute('aria-expanded', 'false');
+            });
 
-                if (wasExpanded) {
-                    // Scroll back to the collapsed card so the user doesn't lose their place
-                    scrollCardIntoView(card);
+            if (wasExpanded) {
+                // Scroll back to the collapsed card so the user doesn't lose their place
+                scrollCardIntoView(card);
+            }
+
+            if (!wasExpanded) {
+                card.classList.add('expanded');
+                header.setAttribute('aria-expanded', 'true');
+                scrollCardIntoView(card);
+
+                if (!expandedCharts.has(agencyKey)) {
+                    expandedCharts.add(agencyKey);
+                    setTimeout(() => {
+                        if (DATA.awards && DATA.awards[agencyKey]) {
+                            renderAwardsCumulativeChart(agencyKey, 'overview-chart-awards-' + agencyKey, 'pct', true);
+                        }
+                        if (DATA.awards_all && DATA.awards_all[agencyKey]) {
+                            renderAwardsCumulativeChart(agencyKey, 'overview-chart-all-' + agencyKey, 'pct', true, DATA.awards_all);
+                        }
+                        if (DATA.spenddown && DATA.spenddown[agencyKey]) {
+                            renderSpenddownChart(agencyKey, 'overview-chart-oblig-' + agencyKey, true, true);
+                        }
+                        // Hide per-chart legends (shared legend is in HTML)
+                        setTimeout(() => suppressLegendsAndTitles(card), 100);
+                    }, 50);
+                } else {
+                    setTimeout(() => {
+                        card.querySelectorAll('.js-plotly-plot').forEach(el => {
+                            Plotly.Plots.resize(el);
+                        });
+                    }, 50);
                 }
+            }
+        }
 
-                if (!wasExpanded) {
-                    card.classList.add('expanded');
-                    scrollCardIntoView(card);
-
-                    if (!expandedCharts.has(agencyKey)) {
-                        expandedCharts.add(agencyKey);
-                        setTimeout(() => {
-                            if (DATA.awards && DATA.awards[agencyKey]) {
-                                renderAwardsCumulativeChart(agencyKey, 'overview-chart-awards-' + agencyKey, 'pct', true);
-                            }
-                            if (DATA.awards_all && DATA.awards_all[agencyKey]) {
-                                renderAwardsCumulativeChart(agencyKey, 'overview-chart-all-' + agencyKey, 'pct', true, DATA.awards_all);
-                            }
-                            if (DATA.spenddown && DATA.spenddown[agencyKey]) {
-                                renderSpenddownChart(agencyKey, 'overview-chart-oblig-' + agencyKey, true, true);
-                            }
-                            // Hide per-chart legends (shared legend is in HTML)
-                            setTimeout(() => suppressLegendsAndTitles(card), 100);
-                        }, 50);
-                    } else {
-                        setTimeout(() => {
-                            card.querySelectorAll('.js-plotly-plot').forEach(el => {
-                                Plotly.Plots.resize(el);
-                            });
-                        }, 50);
-                    }
+        allCards.forEach(card => {
+            var header = card.querySelector('.overview-card-header');
+            header.addEventListener('click', () => toggleCard(card));
+            header.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleCard(card);
                 }
             });
         });
@@ -2626,9 +2664,6 @@
         initExport();
         initAwardsExport();
         renderDataBadge();
-        renderTables();
-        renderAwardsSeriesTable();
-        renderAllAwardsSeriesTable();
         // Show tab buttons for tabs that have data
         if (DATA.awards_all) {
             var aab = document.getElementById('tab-btn-awards-all');
