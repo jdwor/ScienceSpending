@@ -550,6 +550,110 @@ def build_awards_site_data(series_override=None, summary_override=None):
 
             awards_summary[agency] = rec
 
+    # Fill in zero stubs for sub-agencies missing the current FY.
+    # When a sub-agency (e.g. NIMHD) has prior-year data but no current-FY
+    # awards yet, the chart shows no FY line and the metrics table disappears.
+    # Fix: mirror the parent's current-FY date structure with zero values.
+    fy_key = str(CURRENT_FY)
+    for agency_key, adata in awards_data.items():
+        if fy_key in adata["years"]:
+            continue
+        parent_key = AWARDS_CONFIG.get(agency_key, {}).get("parent")
+        if not parent_key or parent_key not in awards_data:
+            continue
+        parent_fy = awards_data[parent_key]["years"].get(fy_key)
+        if not parent_fy:
+            continue
+
+        n = len(parent_fy["fy_days"])
+        adata["years"][fy_key] = {
+            "fy_days": list(parent_fy["fy_days"]),
+            "dates": list(parent_fy["dates"]),
+            "cumulative_count": [0] * n,
+            "cumulative_dollars_m": [0.0] * n,
+            "pct_of_approp": [0.0] * n,
+        }
+        if CURRENT_FY not in adata["fiscal_years"]:
+            adata["fiscal_years"].append(CURRENT_FY)
+
+        # Also fill in a zero summary so the metrics table renders
+        if agency_key not in awards_summary:
+            parent_summ = awards_summary.get(parent_key)
+            if parent_summ:
+                agency_approp_lookup = approp_lookup.get(agency_key, {})
+                approp_val = agency_approp_lookup.get(CURRENT_FY)
+                awards_summary[agency_key] = {
+                    "agency": agency_key,
+                    "source_type": adata["source_type"],
+                    "latest_fy_day": parent_summ["latest_fy_day"],
+                    "latest_date": parent_summ["latest_date"],
+                    "cumul_count": 0,
+                    "cumul_dollars": 0.0,
+                    "prior_year_count": None,
+                    "prior_year_dollars": None,
+                    "mean_count": None,
+                    "mean_dollars": None,
+                    "appropriation": round(approp_val, 2) if approp_val else None,
+                    "cumul_pct_approp": 0.0,
+                    "prior_year_pct_approp": None,
+                    "mean_pct_approp": None,
+                    "mean_dollars": None,
+                    "mean_count": None,
+                }
+                # Compute prior-year and mean benchmarks from the sub-agency's own history
+                agency_series_sub = series[series["agency"] == agency_key]
+                if not agency_series_sub.empty:
+                    latest_day = parent_summ["latest_fy_day"]
+                    reliable = _detect_reliable_years(
+                        agency_series_sub,
+                        sorted(agency_series_sub["fiscal_year"].unique()),
+                        CURRENT_FY,
+                    )
+                    band = [fy for fy in reliable
+                            if fy not in BAND_YEARS_EXCLUDE and fy != CURRENT_FY]
+                    pct_vals, dollar_vals, count_vals = [], [], []
+                    prior_dollars = prior_count = None
+                    for fy in sorted(reliable):
+                        if fy == CURRENT_FY:
+                            continue
+                        fy_data = agency_series_sub[
+                            agency_series_sub["fiscal_year"] == fy
+                        ].sort_values("fy_day")
+                        if fy_data.empty or latest_day < fy_data["fy_day"].values[0]:
+                            continue
+                        days = fy_data["fy_day"].values
+                        dollars = fy_data["cumulative_dollars"].values
+                        interp_d = float(np.interp(latest_day, days, dollars))
+                        if fy == CURRENT_FY - 1:
+                            prior_dollars = interp_d
+                            if "cumulative_count" in fy_data.columns:
+                                prior_count = float(np.interp(
+                                    latest_day, days,
+                                    fy_data["cumulative_count"].values))
+                        if fy in band:
+                            dollar_vals.append(interp_d)
+                            if "cumulative_count" in fy_data.columns:
+                                count_vals.append(float(np.interp(
+                                    latest_day, days,
+                                    fy_data["cumulative_count"].values)))
+                            fy_approp = agency_approp_lookup.get(fy)
+                            if fy_approp and fy_approp > 0:
+                                pct_vals.append(interp_d / fy_approp * 100)
+
+                    rec = awards_summary[agency_key]
+                    rec["prior_year_dollars"] = round(prior_dollars, 2) if prior_dollars is not None else None
+                    rec["prior_year_count"] = round(prior_count, 2) if prior_count is not None else None
+                    if prior_dollars is not None:
+                        prior_approp = agency_approp_lookup.get(CURRENT_FY - 1)
+                        if prior_approp and prior_approp > 0:
+                            rec["prior_year_pct_approp"] = round(prior_dollars / prior_approp * 100, 3)
+                    if pct_vals:
+                        rec["mean_pct_approp"] = round(float(np.mean(pct_vals)), 4)
+                    if dollar_vals:
+                        rec["mean_dollars"] = round(float(np.mean(dollar_vals)), 2)
+                    if count_vals:
+                        rec["mean_count"] = round(float(np.mean(count_vals)), 2)
+
     return awards_data, awards_summary
 
 
