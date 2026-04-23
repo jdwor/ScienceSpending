@@ -13,7 +13,8 @@ python3 data/download.py --check
 python3 -m awards.preprocess
 
 # Update all-awards data (new + continuing; separate cache)
-# Uses NIH Reporter (types 1+2+5) for NIH, USASpending for all others
+# Uses NIH Reporter (types 1+2+3+4+5+7+9 — all extramural grant actions) for NIH,
+# USASpending for all others
 python3 -m awards.preprocess_all
 
 # Full obligations pipeline (download + parse + transform)
@@ -57,7 +58,7 @@ The NSF Awards API is used for the **New Awards tab only** (the All Awards tab u
 
 | Key | Name | SF-133 Source | New Awards Source | All Awards Source |
 |-----|------|--------------|-------------------|-------------------|
-| NIH | NIH (Institutes + OD) | HHS file, bureau filter | NIH Reporter (types 1+2) | NIH Reporter (types 1+2+5, FY2017+) |
+| NIH | NIH (Institutes + OD) | HHS file, bureau filter | NIH Reporter (types 1+2) | NIH Reporter (types 1+2+3+4+5+7+9, FY2017+) |
 | NSF | NSF (R&RA + EDU) | NSF file, TRACCTs 100, 106 | NSF Awards API | USASpending (action_date) |
 | DOE_SC | DOE (Science + ARPA-E) | DOE file, TRACCTs 222, 337 | USASpending (CFDA 81.049, 81.135) | USASpending (action_date) |
 | NASA_SCI | NASA (Science) | NASA file, TRACCT 120 | USASpending (CFDA 43.001, 43.013) | USASpending (action_date) |

@@ -1,9 +1,9 @@
 """
 Preprocess "all awards" data (new + continuing) for all agencies.
 
-Uses NIH Reporter (types 1+2+5) for NIH and its sub-agencies, and
-USASpending with action_date for DOE, NASA, and USDA — capturing
-continuations, modifications, and new awards.
+Uses NIH Reporter (types 1+2+3+4+5+7+9 — all extramural grant actions)
+for NIH and its sub-agencies, and USASpending with action_date for DOE,
+NASA, and USDA — capturing continuations, modifications, and new awards.
 
     python3 -m awards.preprocess_all [--force]
 
@@ -48,7 +48,7 @@ def main(
 
     # --- NIH Reporter: fetch once with types 1+2+5, share across NIH family ---
     if nih_keys:
-        print("Fetching NIH all-awards data (types 1+2+5) from NIH Reporter...")
+        print("Fetching NIH all-awards data (types 1+2+3+4+5+7+9) from NIH Reporter...")
         nih_years = fiscal_years or NIH_ALL_AWARDS_FISCAL_YEARS
         nih_df = fetch_nih_all(
             fiscal_years=nih_years, force=force,

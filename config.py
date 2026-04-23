@@ -248,7 +248,14 @@ NIH_REPORTER_RATE_LIMIT = 1.0  # seconds between requests
 NIH_REPORTER_PAGE_SIZE = 500
 NIH_REPORTER_MAX_OFFSET = 14999
 NIH_COMPETING_TYPES = ["1", "2"]  # Type 1 (New) + Type 2 (Competing Renewal)
-NIH_ALL_TYPES = ["1", "2", "5"]   # + Type 5 (Non-Competing Continuation)
+# All extramural grant actions. Matches the scope of NIH's official
+# "competing + noncompeting grants" figure (e.g., $35.3B for FY25).
+#   3 = Revision (competitive revision or administrative supplement)
+#   4 = Extension (competing extension for R37/Fast-Track SBIR/STTR; 4C/4N)
+#   5 = Non-Competing Continuation
+#   7 = Change of grantee institution (admin)
+#   9 = Change of NIH Institute/Division on a Type 2 renewal (admin)
+NIH_ALL_TYPES = ["1", "2", "3", "4", "5", "7", "9"]
 # FY2016 Type 5 data from NIH Reporter is significantly lower than USASpending
 # figures for the same year (~$16.5B vs ~$23.5B), unlike FY2017+ which align
 # closely, suggesting a data integrity issue in the earlier Reporter records.

@@ -22,6 +22,18 @@
         usaspending: 'USASpending',
     };
 
+    // Plotly loads async so overview cards render without waiting for ~1MB of chart
+    // library. Guard the handful of call sites that might fire before it's ready.
+    function whenPlotlyReady(fn) {
+        if (typeof Plotly !== 'undefined') return fn();
+        const iv = setInterval(function () {
+            if (typeof Plotly !== 'undefined') {
+                clearInterval(iv);
+                fn();
+            }
+        }, 50);
+    }
+
     // ── Agency Descriptions ──
     let DATA = null;
 
@@ -277,12 +289,17 @@
                 renderedTabs.add(tabName);
                 // Defer chart rendering until after the tab is visible
                 setTimeout(() => {
-                    if (tabName === 'overview') renderOverviewCards();
-                    if (tabName === 'obligations') renderObligationsTab();
-                    if (tabName === 'awards') initAwardsTab();
-                    if (tabName === 'awards-all') initAllAwardsTab();
-                    if (tabName === 'unified') initUnifiedTab();
-                    if (tabName === 'data') { renderTables(); renderAwardsSeriesTable(); renderAllAwardsSeriesTable(); }
+                    // Overview tab has no Plotly charts — render immediately.
+                    if (tabName === 'overview') { renderOverviewCards(); return; }
+                    // All other tabs draw Plotly charts; wait until the async
+                    // library finishes loading before rendering them.
+                    whenPlotlyReady(() => {
+                        if (tabName === 'obligations') renderObligationsTab();
+                        if (tabName === 'awards') initAwardsTab();
+                        if (tabName === 'awards-all') initAllAwardsTab();
+                        if (tabName === 'unified') initUnifiedTab();
+                        if (tabName === 'data') { renderTables(); renderAwardsSeriesTable(); renderAllAwardsSeriesTable(); }
+                    });
                 }, 10);
             }
             setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
@@ -510,7 +527,7 @@
 
                 if (!expandedCharts.has(agencyKey)) {
                     expandedCharts.add(agencyKey);
-                    setTimeout(() => {
+                    setTimeout(() => whenPlotlyReady(() => {
                         if (DATA.awards && DATA.awards[agencyKey]) {
                             renderAwardsCumulativeChart(agencyKey, 'overview-chart-awards-' + agencyKey, 'pct', true);
                         }
@@ -522,13 +539,13 @@
                         }
                         // Hide per-chart legends (shared legend is in HTML)
                         setTimeout(() => suppressLegendsAndTitles(card), 100);
-                    }, 50);
+                    }), 50);
                 } else {
-                    setTimeout(() => {
+                    setTimeout(() => whenPlotlyReady(() => {
                         card.querySelectorAll('.js-plotly-plot').forEach(el => {
                             Plotly.Plots.resize(el);
                         });
-                    }, 50);
+                    }), 50);
                 }
             }
         }
@@ -672,6 +689,8 @@
     // ── Single-Agency Spend-Down Chart ──
 
     function renderSpenddownChart(agencyKey, targetDiv, showPct, compact) {
+        // Plotly loads async — chart renders on tab activation after Plotly is ready.
+        if (typeof Plotly === 'undefined') return;
         const cfg = DATA.config;
         const agency = cfg.agencies[agencyKey];
         const agencyData = DATA.spenddown[agencyKey];
