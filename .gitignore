@@ -1,5 +1,6 @@
 data/cache/
 awards/cache/
+awards/fonts/
 output/
 __pycache__/
 *.pyc
