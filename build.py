@@ -18,8 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import (
     AGENCIES, AWARDS_CONFIG, CURRENT_FY, HIGHLIGHT_YEARS,
-    BAND_YEARS_EXCLUDE, FY_MONTH_LABELS,
+    BAND_YEARS_EXCLUDE, FY_MONTH_LABELS, highlight_years, band_years_exclude,
 )
+from data.transform import get_obligations_fy
 
 PROCESSED_DIR = Path(__file__).resolve().parent / "data" / "processed"
 AWARDS_PROCESSED_DIR = Path(__file__).resolve().parent / "awards" / "processed"
@@ -59,9 +60,9 @@ def build_agency_configs():
     return configs
 
 
-def compute_prior_year_envelope(agency_data, fiscal_years, show_pct=True):
+def compute_prior_year_envelope(agency_data, fiscal_years, band_exclude, show_pct=True):
     """Compute min/max/mean band from band-eligible fiscal years."""
-    band_fys = [fy for fy in fiscal_years if fy not in BAND_YEARS_EXCLUDE]
+    band_fys = [fy for fy in fiscal_years if fy not in band_exclude]
     if not band_fys:
         return None
 
@@ -101,9 +102,9 @@ def compute_prior_year_envelope(agency_data, fiscal_years, show_pct=True):
     }
 
 
-def compute_mean_lookup(agency_data, fiscal_years, show_pct=True):
+def compute_mean_lookup(agency_data, fiscal_years, band_exclude, show_pct=True):
     """Build {month: mean_value} from band-eligible years."""
-    band_fys = [fy for fy in fiscal_years if fy not in BAND_YEARS_EXCLUDE]
+    band_fys = [fy for fy in fiscal_years if fy not in band_exclude]
     means = {}
     y_col = "pct_obligated" if show_pct else "obligations"
     for m in range(1, 13):
@@ -125,9 +126,10 @@ def compute_mean_lookup(agency_data, fiscal_years, show_pct=True):
     return means
 
 
-def build_spenddown_data(obligation_series):
+def build_spenddown_data(obligation_series, obligations_fy):
     """Build per-agency spend-down chart data (for both pct and dollar views)."""
     agencies_data = {}
+    band_exclude = band_years_exclude(obligations_fy)
 
     for agency_key in AGENCIES:
         agency_data = obligation_series[obligation_series["agency"] == agency_key].copy()
@@ -137,8 +139,8 @@ def build_spenddown_data(obligation_series):
         fiscal_years = sorted(agency_data["fiscal_year"].unique())
 
         # Envelopes for pct and dollar modes
-        envelope_pct = compute_prior_year_envelope(agency_data, fiscal_years, show_pct=True)
-        envelope_dollar = compute_prior_year_envelope(agency_data, fiscal_years, show_pct=False)
+        envelope_pct = compute_prior_year_envelope(agency_data, fiscal_years, band_exclude, show_pct=True)
+        envelope_dollar = compute_prior_year_envelope(agency_data, fiscal_years, band_exclude, show_pct=False)
 
         # Individual year traces
         year_traces = {}
@@ -180,20 +182,21 @@ def build_spenddown_data(obligation_series):
     return agencies_data
 
 
-def build_multi_agency_data(obligation_series):
+def build_multi_agency_data(obligation_series, obligations_fy):
     """Build data for the multi-agency comparison chart."""
     traces = {}
+    band_exclude = band_years_exclude(obligations_fy)
 
     for agency_key in AGENCIES:
         if "parent" in AGENCIES[agency_key]:
             continue  # Only parent agencies in multi-agency chart
         agency_all = obligation_series[obligation_series["agency"] == agency_key]
         all_fys = sorted(agency_all["fiscal_year"].unique())
-        agency_fy = agency_all[agency_all["fiscal_year"] == CURRENT_FY].sort_values("period_month")
+        agency_fy = agency_all[agency_all["fiscal_year"] == obligations_fy].sort_values("period_month")
         if agency_fy.empty:
             continue
 
-        means = compute_mean_lookup(agency_all, all_fys, show_pct=True)
+        means = compute_mean_lookup(agency_all, all_fys, band_exclude, show_pct=True)
 
         x_vals = []
         y_vals = []
@@ -218,7 +221,7 @@ def build_multi_agency_data(obligation_series):
     return traces
 
 
-def build_summary_data(obligation_series, approp_summary):
+def build_summary_data(obligation_series, approp_summary, obligations_fy):
     """Build summary metric cards for each agency."""
     from charts.summary import compute_agency_summary, format_dollars
 
@@ -226,7 +229,9 @@ def build_summary_data(obligation_series, approp_summary):
     for agency_key in AGENCIES:
         if agency_key not in obligation_series["agency"].unique():
             continue
-        summary = compute_agency_summary(obligation_series, approp_summary, agency_key)
+        summary = compute_agency_summary(
+            obligation_series, approp_summary, agency_key, current_fy=obligations_fy,
+        )
         # Make JSON-serializable
         for k, v in summary.items():
             if isinstance(v, (np.floating, np.integer)):
@@ -293,6 +298,13 @@ def _load_approp_lookup():
         val = row.get("approp_disc_raw")
         if pd.notna(val) and val > 0:
             lookup.setdefault(agency, {})[fy] = float(val)
+    # A new FY has no SF-133 appropriation until its first report (~late
+    # December). Until then, the awards views use the prior FY's appropriation
+    # as the denominator — a continuing resolution funds agencies at roughly
+    # the prior-year rate, which is also what SF-133 line 1100 reports.
+    for by_fy in lookup.values():
+        if CURRENT_FY not in by_fy and (CURRENT_FY - 1) in by_fy:
+            by_fy[CURRENT_FY] = by_fy[CURRENT_FY - 1]
     # Fall back to parent appropriation for sub-agencies without their own
     for key, cfg in AGENCIES.items():
         if key not in lookup and "parent" in cfg and cfg["parent"] in lookup:
@@ -721,8 +733,13 @@ def main():
     print("Loading preprocessed CSVs...")
     obligation_series, approp_summary, yoy_comparison = load_csvs()
 
-    # Derive latest period label from obligation_series for current FY
-    current_fy_data = obligation_series[obligation_series["fiscal_year"] == CURRENT_FY]
+    # The obligations views lag CURRENT_FY until the new FY's first SF-133
+    # report exists (~late December); the awards views use CURRENT_FY.
+    obligations_fy = get_obligations_fy(obligation_series)
+    print(f"Obligations FY: {obligations_fy} | Awards FY: {CURRENT_FY}")
+
+    # Derive latest period label from obligation_series for the obligations FY
+    current_fy_data = obligation_series[obligation_series["fiscal_year"] == obligations_fy]
     if not current_fy_data.empty:
         latest_month = int(current_fy_data["period_month"].max())
         latest_period_label = FY_MONTH_LABELS.get(latest_month, f"Month {latest_month}")
@@ -736,16 +753,21 @@ def main():
     site_data = {
         "config": {
             "agencies": build_agency_configs(),
-            "current_fy": CURRENT_FY,
-            "highlight_years": HIGHLIGHT_YEARS,
-            "band_years_exclude": list(BAND_YEARS_EXCLUDE),
+            # current_fy / highlight_years / band_years_exclude describe the
+            # obligations views; awards_* keys describe the awards views.
+            "current_fy": obligations_fy,
+            "highlight_years": highlight_years(obligations_fy),
+            "band_years_exclude": sorted(band_years_exclude(obligations_fy)),
+            "awards_current_fy": CURRENT_FY,
+            "awards_highlight_years": HIGHLIGHT_YEARS,
+            "awards_band_years_exclude": sorted(BAND_YEARS_EXCLUDE),
             "fy_month_labels": FY_MONTH_LABELS,
             "build_date": datetime.date.today().isoformat(),
             "latest_period_label": latest_period_label,
         },
-        "spenddown": build_spenddown_data(obligation_series),
-        "multi_agency": build_multi_agency_data(obligation_series),
-        "summaries": build_summary_data(obligation_series, approp_summary),
+        "spenddown": build_spenddown_data(obligation_series, obligations_fy),
+        "multi_agency": build_multi_agency_data(obligation_series, obligations_fy),
+        "summaries": build_summary_data(obligation_series, approp_summary, obligations_fy),
         "tables": build_data_tables(approp_summary, yoy_comparison),
     }
 

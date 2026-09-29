@@ -295,9 +295,9 @@
                         and USDA by ARS vs NIFA. Sub-agency views use the parent agency&rsquo;s total appropriation as the denominator
                         for percentage calculations.</p>
 
-                        <!-- MAINTENANCE: Update FY range below when BAND_YEARS_EXCLUDE changes in config.py -->
+                        <!-- FY years in data-fy spans are filled in from site_data.json by app.js (fillFyText) -->
                         <p><strong>Historical range.</strong> The shaded band on spend-down charts shows the minimum-to-maximum range across
-                        prior fiscal years (FY2016&ndash;FY2024). The dashed line shows the average. These provide context for whether
+                        prior fiscal years (FY2016&ndash;FY<span data-fy="oblig-band-end">2024</span>). The dashed line shows the average. These provide context for whether
                         current-year spending is within normal bounds. FY2016 and FY2017 data is available at non-quarterly months only
                         (8 of 12 periods); the historical range at quarterly reporting periods uses FY2018 onward. FY2020 included
                         emergency supplemental appropriations (CARES Act) that affected spending levels; this year is included in the
@@ -390,16 +390,19 @@
                         awards by decision date. USASpending uses a <code>new_awards_only</code> filter that isolates initial
                         obligations on newly created award records. These series are broadly comparable but not identical.</p>
 
-                        <!-- MAINTENANCE: Update FY ranges below when BAND_YEARS_EXCLUDE changes in config.py -->
+                        <!-- FY years in data-fy spans are filled in from site_data.json by app.js (fillFyText) -->
                         <p><strong>Historical range.</strong> The shaded band on charts shows the minimum-to-maximum range across
-                        available prior fiscal years; the dashed line shows the average. NIH and NSF baselines cover FY2016&ndash;2024.
+                        available prior fiscal years; the dashed line shows the average. NIH and NSF baselines cover FY2016&ndash;<span data-fy="awards-band-end">2024</span>.
                         USASpending coverage begins later for some agencies: NASA from FY2017, USDA from FY2018, DOE from FY2019.
-                        Years with incomplete source coverage are automatically excluded. FY2025 and FY2026 are shown as individual
+                        Years with incomplete source coverage are automatically excluded. FY<span data-fy="awards-prior">2025</span> and FY<span data-fy="awards-current">2026</span> are shown as individual
                         lines and excluded from the historical band.</p>
 
                         <p><strong>Normalization.</strong> Cumulative new award dollars are expressed as a percentage of the
                         discretionary appropriation (SF-133 Line 1100) for the relevant research component. Mandatory appropriation
-                        (Line 1200) is excluded because competitive grants are funded from discretionary accounts.</p>
+                        (Line 1200) is excluded because competitive grants are funded from discretionary accounts.
+                        A new fiscal year has no SF-133 appropriation until its first report is published (typically late
+                        December), so until then the prior year&rsquo;s appropriation is used as the denominator&mdash;approximately
+                        the level a Continuing Resolution provides.</p>
 
                         <p><strong>Provisional data.</strong> Where the latest reporting period is incomplete, the final data point
                         reflects awards through the most recent available date and may be revised upward in subsequent updates.</p>
@@ -481,18 +484,21 @@
                         totals may briefly go negative early in a fiscal year for some agencies. Charts floor these values
                         at zero for readability; the underlying data retains the actual values.</p>
 
-                        <!-- MAINTENANCE: Update FY ranges below when BAND_YEARS_EXCLUDE changes in config.py -->
+                        <!-- FY years in data-fy spans are filled in from site_data.json by app.js (fillFyText) -->
                         <p><strong>Historical range.</strong> The shaded band on charts shows the minimum-to-maximum range across
                         available prior fiscal years; the dashed line shows the average. NIH all-awards data begins in FY2017;
                         FY2016 is excluded because Type 5 (non-competing continuation) records are significantly underreported in
                         NIH Reporter for that year, unlike FY2017 onward which align closely with USASpending totals.
                         USASpending coverage begins later for some agencies: NASA from FY2017, USDA from FY2018, DOE from FY2019.
-                        Years with incomplete source coverage are automatically excluded. FY2025 and FY2026 are shown as individual
+                        Years with incomplete source coverage are automatically excluded. FY<span data-fy="awards-prior">2025</span> and FY<span data-fy="awards-current">2026</span> are shown as individual
                         lines and excluded from the historical band.</p>
 
                         <p><strong>Normalization.</strong> Cumulative grant obligation dollars are expressed as a percentage of the
                         discretionary appropriation (SF-133 Line 1100) for the relevant research component. Mandatory appropriation
-                        (Line 1200) is excluded because competitive grants are funded from discretionary accounts.</p>
+                        (Line 1200) is excluded because competitive grants are funded from discretionary accounts.
+                        A new fiscal year has no SF-133 appropriation until its first report is published (typically late
+                        December), so until then the prior year&rsquo;s appropriation is used as the denominator&mdash;approximately
+                        the level a Continuing Resolution provides.</p>
 
                         <p><strong>Provisional data.</strong> Where the latest reporting period is incomplete, the final data point
                         reflects obligations through the most recent available month and may be revised in subsequent updates.</p>

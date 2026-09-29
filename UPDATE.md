@@ -9,7 +9,9 @@
 | Both awards pipelines | `python3 -m awards.preprocess && python3 -m awards.preprocess_all && python3 build.py` |
 | Check for new obligations data | `python3 data/download.py --check` |
 | Full update (obligations + awards) | See [Step-by-Step Update](#step-by-step-update) |
-| Fiscal year rollover | See [Annual FY Rollover](#annual-fiscal-year-rollover) |
+| Fiscal year rollover | Automatic — see [Fiscal Year Rollover](#fiscal-year-rollover) |
+| Automated weekly updates | See [Automated Weekly Updates](#automated-weekly-updates) |
+| Validate a build before publishing | `python3 scripts/validate_update.py` |
 
 ---
 
@@ -146,59 +148,58 @@ Cache: `awards/cache/usaspending_all/{agency}_fy{year}.json`
 
 ---
 
-## Annual Fiscal Year Rollover
+## Fiscal Year Rollover
 
-When a new fiscal year begins (October 1):
+The rollover is automatic — nothing needs editing on October 1. `config.CURRENT_FY`
+is derived from the date, and the FY ranges, highlight years, and historical-band
+years all follow from it. Set `SCISPEND_TODAY=YYYY-MM-DD` to simulate another date
+(e.g. `SCISPEND_TODAY=2026-10-05 python3 build.py`).
 
-### 1. Update `config.py`
+The obligations and awards views roll over at different times, because SF-133 has
+no October report:
 
-```python
-CURRENT_FY = 2027                    # was 2026
-FISCAL_YEARS = list(range(2016, 2028))        # extend by 1
-AWARDS_FISCAL_YEARS = list(range(2016, 2028)) # extend by 1
-NIH_ALL_AWARDS_FISCAL_YEARS = list(range(2017, 2028))  # extend by 1 (starts FY2017)
-HIGHLIGHT_YEARS = [2027, 2026]                # shift forward
-BAND_YEARS_EXCLUDE = {2027, 2026}             # shift forward
-```
+| When | Awards tabs | Obligations tab |
+|------|-------------|-----------------|
+| Oct 1 | Switch to the new FY (starts at $0 with a zero point "as of yesterday") | Stay on the prior FY, which keeps filling in (Aug, then final Sep report) |
+| ~Late Dec (first SF-133 report, November) | — | Switch to the new FY (`data.transform.get_obligations_fy` = latest FY with SF-133 data) |
 
-### 2. Update `file_registry.json`
+What handles each piece:
 
-Add a new entry for the new FY. The attachment ID and filenames must be obtained from the OMB MAX portal:
+- **Registry:** `data/download.py --check` discovers the new FY's attachment ID on
+  its OMB MAX page and adds it to `file_registry.json` once OMB posts it.
+- **Prior-FY data:** caches for the prior FY keep refreshing for
+  `PRIOR_FY_REFRESH_DAYS` (120) after Oct 1 (`config.is_fy_frozen`), so late
+  SF-133 reports, NIH Reporter backfill, and USASpending lag are captured.
+- **Appropriation denominator:** until the new FY's first SF-133 report exists, the
+  awards views use the prior FY's appropriation (≈ the CR rate) for "% of appropriation".
+- **Frontend:** `config.current_fy` / `highlight_years` / `band_years_exclude` in
+  `site_data.json` describe the obligations views; `awards_current_fy` /
+  `awards_highlight_years` / `awards_band_years_exclude` describe the awards views.
+  Methodology FY ranges are filled in from the data (`fillFyText` in `app.js`).
 
-```json
-"2027": {
-    "attachment_id": "XXXXXXXXXX",
-    "files": {
-        "hhs": "FY2027_SF133_MONTHLY_Department_of_Health_and_Human_Services.xlsx",
-        "nsf": "FY2027_SF133_MONTHLY_National_Science_Foundation.xlsx",
-        "doe": "FY2027_SF133_MONTHLY_Department_of_Energy.xlsx",
-        "nasa": "FY2027_SF133_MONTHLY_National_Aeronautics_and_Space_Administration.xlsx",
-        "usda": "FY2027_SF133_MONTHLY_Department_of_Agriculture.xlsx"
-    }
-}
-```
+**Verify after each rollover stage:** the new FY appears as the highlighted line,
+the prior FY moves to gray, and the band gains the prior-prior year.
 
-### 3. Run full pipeline
+---
 
-```bash
-python3 data/download.py --years 2027
-python3 data/preprocess.py
-python3 -m awards.preprocess
-python3 -m awards.preprocess_all
-python3 build.py
-```
+## Automated Weekly Updates
 
-### 4. Update hardcoded FY ranges in `docs/index.html`
+A launchd job runs `scripts/auto_update.sh` every **Monday at 7:00 AM** (or at next
+wake, if the Mac was asleep). It runs Steps 1–3, validates the result, and commits +
+pushes `data update` to `main` (GitHub Pages redeploys). If any step fails, nothing
+is published and the site keeps its last good data.
 
-Search for `MAINTENANCE: Update FY range` comments in the HTML. Update the hardcoded range text (e.g., "FY2016–FY2024" → "FY2016–FY2025") to match the new `BAND_YEARS_EXCLUDE` setting.
+| Item | Detail |
+|------|--------|
+| Runs from | `~/ScienceSpending-auto` — a dedicated clone. macOS blocks launchd jobs from reading `~/Documents`, so it can't use this repo. It holds its own copy of the API caches and resets to `origin/main` at the start of each run. |
+| Schedule | `~/Library/LaunchAgents/org.sciencespending.update.plist` (template in `scripts/`) |
+| Logs | `~/Library/Logs/sciencespending/` — `STATUS.txt` has the last result; one log per run |
+| Guardrails | `scripts/validate_update.py`: completed FYs must not change; NSF completed-FY % of appropriation 48–65%; all agencies present; files didn't shrink; obligations period never goes backwards. An NSF current-FY drop triggers a clean NSF re-fetch; if it reproduces, it's published as real. |
+| Dry run | `SCISPEND_DRY_RUN=1 ~/ScienceSpending-auto/scripts/auto_update.sh` |
+| Run now | `launchctl kickstart gui/$(id -u)/org.sciencespending.update` |
+| Pause / resume | `launchctl bootout gui/$(id -u)/org.sciencespending.update` / `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.sciencespending.update.plist` |
 
-### 5. Verify
-
-- New FY appears as highlighted line on charts
-- Previous FY moves from highlighted to band-year
-- Summary tables show new FY values
-- Historical envelope band now includes the prior-prior year
-- Methodology text shows correct FY range for historical band
+After a stretch of automated runs, `git pull` this repo before working in it.
 
 ---
 
@@ -209,7 +210,8 @@ Search for `MAINTENANCE: Update FY range` comments in the HTML. Update the hardc
 | `download.py` returns 403/404 | Attachment ID changed on MAX portal | Find new ID on portal page, update `file_registry.json` |
 | Awards API timeout | Transient network issue | Retry; pipeline uses caching so partial progress is saved |
 | Missing months in charts | SF-133 file doesn't have that period yet | Wait for OMB to publish; check with `--check` |
-| Appropriation shows 0 during CR | Normal — Line 1100 is 0 under Continuing Resolution | No fix needed; values correct once full-year bill enacted |
+| Appropriation looks off during CR | Line 1100 reports the CR's annualized rate, not the enacted level | No fix needed; values correct once full-year bill enacted |
+| Automated update didn't publish | See `~/Library/Logs/sciencespending/STATUS.txt` and the latest log | Fix the cause, then run it now (see [Automated Weekly Updates](#automated-weekly-updates)) |
 | `openpyxl` error reading Excel | Corrupt download | Delete cached file, re-download with `--force` |
 | Awards data empty for agency | API changed or CFDA codes updated | Check API directly; verify CFDA codes in `config.py` |
 | Build fails on missing CSV | Preprocess step was skipped | Run `python3 data/preprocess.py` and/or `python3 -m awards.preprocess` first |

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from config import AGENCIES, BAND_YEARS_EXCLUDE, LINE_ITEMS, FY_MONTH_LABELS
+from config import AGENCIES, LINE_ITEMS, FY_MONTH_LABELS, band_years_exclude
 
 
 def build_obligation_series(df: pd.DataFrame) -> pd.DataFrame:
@@ -107,9 +107,20 @@ def build_appropriations_summary(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+def get_obligations_fy(obligation_series: pd.DataFrame) -> int | None:
+    """The FY the obligations views treat as current: the latest FY with SF-133 data.
+
+    Lags the calendar FY at the start of each year, because a new FY's first
+    SF-133 report (November) isn't published until ~late December.
+    """
+    if obligation_series.empty:
+        return None
+    return int(obligation_series["fiscal_year"].max())
+
+
 def compute_yoy_comparison(
     obligation_series: pd.DataFrame,
-    current_fy: int = 2026,
+    current_fy: int | None = None,
 ) -> pd.DataFrame:
     """
     For each agency, compute year-over-year metrics at each available period
@@ -119,6 +130,9 @@ def compute_yoy_comparison(
         agency, period_month, current_obligations, prior_year_obligations,
         yoy_change, yoy_pct_change, mean_prior_obligations
     """
+    if current_fy is None:
+        current_fy = get_obligations_fy(obligation_series)
+    band_exclude = band_years_exclude(current_fy)
     records = []
 
     for agency in obligation_series["agency"].unique():
@@ -141,9 +155,9 @@ def compute_yoy_comparison(
             prior_pct = prior_same["pct_obligated"].iloc[0] if not prior_same.empty else None
 
             # Mean spend-down rate across band-eligible prior years at same month
-            # (excludes BAND_YEARS_EXCLUDE to match envelope and summary computations)
+            # (excludes band_exclude to match envelope and summary computations)
             prior_band = prior[
-                (~prior["fiscal_year"].isin(BAND_YEARS_EXCLUDE))
+                (~prior["fiscal_year"].isin(band_exclude))
                 & (prior["period_month"] == month)
             ]["pct_obligated"]
             mean_pct = prior_band.mean() if not prior_band.empty else None

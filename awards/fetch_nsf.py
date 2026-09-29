@@ -18,6 +18,7 @@ import requests
 
 from config import (
     CURRENT_FY,
+    is_fy_frozen,
     NSF_AWARDS_URL,
     NSF_MAX_RESULTS,
     NSF_AWARD_CFDAS,
@@ -50,7 +51,7 @@ def _cache_path(fiscal_year: int, cal_year: int, cal_month: int) -> Path:
 def _cache_is_fresh(path: Path, fiscal_year: int) -> bool:
     if not path.exists():
         return False
-    if fiscal_year < CURRENT_FY:
+    if is_fy_frozen(fiscal_year):
         return True
     age = datetime.now() - datetime.fromtimestamp(path.stat().st_mtime)
     return age < timedelta(hours=24)

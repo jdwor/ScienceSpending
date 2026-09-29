@@ -5,15 +5,15 @@ from __future__ import annotations
 
 import pandas as pd
 
-from config import AGENCIES, BAND_YEARS_EXCLUDE, CURRENT_FY, FY_MONTH_LABELS
-from data.transform import get_latest_period
+from config import AGENCIES, FY_MONTH_LABELS, band_years_exclude
+from data.transform import get_latest_period, get_obligations_fy
 
 
 def compute_agency_summary(
     obligation_series: pd.DataFrame,
     approp_summary: pd.DataFrame,
     agency_key: str,
-    current_fy: int = CURRENT_FY,
+    current_fy: int | None = None,
 ) -> dict:
     """
     Compute summary metrics for one agency in the current FY.
@@ -30,6 +30,8 @@ def compute_agency_summary(
     """
     cfg = AGENCIES[agency_key]
     agency_data = obligation_series[obligation_series["agency"] == agency_key]
+    if current_fy is None:
+        current_fy = get_obligations_fy(obligation_series)
 
     latest_month = get_latest_period(obligation_series, current_fy)
     if latest_month is None:
@@ -57,9 +59,9 @@ def compute_agency_summary(
     prior_pct = prior["pct_obligated"].iloc[0] if not prior.empty else None
 
     # Mean spend-down rate and obligations across band-eligible prior years at same period
-    # (must match the envelope computation, which excludes BAND_YEARS_EXCLUDE)
+    # (must match the envelope computation, which excludes band_years_exclude)
     all_prior_rows = agency_data[
-        (~agency_data["fiscal_year"].isin(BAND_YEARS_EXCLUDE))
+        (~agency_data["fiscal_year"].isin(band_years_exclude(current_fy)))
         & (agency_data["fiscal_year"] < current_fy)
         & (agency_data["period_month"] == latest_month)
     ]

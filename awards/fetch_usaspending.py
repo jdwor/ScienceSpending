@@ -17,6 +17,7 @@ import requests
 from config import (
     AWARDS_CONFIG,
     CURRENT_FY,
+    is_fy_frozen,
     USASPENDING_AWARD_SEARCH_URL,
     USASPENDING_AWARD_TYPE_CODES,
     USASPENDING_TIME_URL,
@@ -33,7 +34,7 @@ def _cache_path(agency_key: str, fiscal_year: int) -> Path:
 def _cache_is_fresh(path: Path, fiscal_year: int) -> bool:
     if not path.exists():
         return False
-    if fiscal_year < CURRENT_FY:
+    if is_fy_frozen(fiscal_year):
         return True
     age = datetime.now() - datetime.fromtimestamp(path.stat().st_mtime)
     return age < timedelta(hours=24)

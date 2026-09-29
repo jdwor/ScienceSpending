@@ -41,8 +41,19 @@ Follow `UPDATE.md` for the complete step-by-step update workflow, including:
 - Quick awards-only updates
 - Full obligation + awards updates
 - How to detect new SF-133 data
-- Annual fiscal year rollover procedure
+- Fiscal year rollover (automatic — `CURRENT_FY` is derived from the date)
+- Automated weekly updates (launchd job, Mondays 7 AM)
 - Troubleshooting common issues
+
+**Automation:** `scripts/auto_update.sh` runs weekly from the dedicated clone
+`~/ScienceSpending-auto` (not this repo — macOS blocks launchd from reading
+`~/Documents`), validates with `scripts/validate_update.py`, and pushes
+`data update` commits to main. `git pull` before working here. Logs:
+`~/Library/Logs/sciencespending/STATUS.txt`.
+
+**Rollover:** awards views switch to the new FY on Oct 1; obligations views
+switch when the new FY's first SF-133 report exists (~late Dec). Test any date
+with `SCISPEND_TODAY=YYYY-MM-DD`. Never hardcode fiscal years.
 
 ## Critical: NSF Dollar Extraction (New Awards Tab)
 

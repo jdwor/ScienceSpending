@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import warnings
 from datetime import date
@@ -26,6 +27,11 @@ if str(PROJECT_ROOT) not in sys.path:
 CACHE_DIR = PROJECT_ROOT / "data" / "cache"
 REGISTRY_PATH = PROJECT_ROOT / "file_registry.json"
 BASE_URL = "https://portal.max.gov/portal/document/SF133/Budget/attachments"
+# Each FY's SF-133 page on OMB MAX lists that year's attachment links
+FY_PAGE_URL = (
+    "https://portal.max.gov/portal/document/SF133/Budget/"
+    "FY%20{fy}%20-%20SF%20133%20Reports%20on%20Budget%20Execution%20and%20Budgetary%20Resources.html"
+)
 
 
 def load_registry() -> dict:
@@ -81,8 +87,8 @@ def download_all(
                 downloaded[label] = dest
             except requests.HTTPError as e:
                 print(f"  [ERROR] {label}: {e}", file=sys.stderr)
-            except requests.ConnectionError as e:
-                print(f"  [ERROR] {label}: connection failed", file=sys.stderr)
+            except requests.RequestException as e:
+                print(f"  [ERROR] {label}: {type(e).__name__}", file=sys.stderr)
 
     return downloaded
 
@@ -182,6 +188,53 @@ def _detect_latest_month_in_file(filepath: Path) -> int | None:
     return latest
 
 
+def discover_registry_entry(fiscal_year: int) -> dict | None:
+    """Find a new FY's attachment ID and filenames on its OMB MAX page.
+
+    OMB posts each FY's SF-133 files under one attachment ID, named like
+    FY2026_SF133_MONTHLY_Department_of_Energy.xlsx. Expected names are derived
+    from the latest registry entry. Returns None until the page exists and
+    lists every tracked agency's file.
+    """
+    registry = load_registry()
+    latest_fy = max(int(k) for k in registry)
+    template = registry[str(latest_fy)]["files"]
+    expected = {
+        key: name.replace(f"FY{latest_fy}_", f"FY{fiscal_year}_", 1)
+        for key, name in template.items()
+    }
+    try:
+        resp = requests.get(FY_PAGE_URL.format(fy=fiscal_year), timeout=60)
+    except requests.RequestException:
+        return None
+    if resp.status_code != 200:
+        return None
+    links = re.findall(r"attachments/(\d+)/([^\"'?#]+\.xlsx)", resp.text)
+    for attachment_id in {aid for aid, _ in links}:
+        names = {name for aid, name in links if aid == attachment_id}
+        if all(name in names for name in expected.values()):
+            return {"attachment_id": attachment_id, "files": expected}
+    return None
+
+
+def ensure_registry_entry(fiscal_year: int) -> bool:
+    """Make sure file_registry.json has fiscal_year, discovering it if needed."""
+    if str(fiscal_year) in load_registry():
+        return True
+    entry = discover_registry_entry(fiscal_year)
+    if entry is None:
+        print(f"  FY{fiscal_year} SF-133 files not yet posted on OMB MAX.")
+        return False
+    registry = load_registry()
+    registry[str(fiscal_year)] = entry
+    registry = dict(sorted(registry.items()))
+    with open(REGISTRY_PATH, "w") as f:
+        json.dump(registry, f, indent=2)
+        f.write("\n")
+    print(f"  Added FY{fiscal_year} to file_registry.json (attachment {entry['attachment_id']}).")
+    return True
+
+
 def check_for_new_data() -> dict:
     """Check whether new SF-133 monthly data is available.
 
@@ -194,56 +247,68 @@ def check_for_new_data() -> dict:
         - file_period_label: label for file_fy_month
         - new_data: True if the downloaded file has newer data than the site
     """
-    from config import CURRENT_FY, FY_MONTH_LABELS
+    from config import CURRENT_FY, FY_MONTH_LABELS, TODAY, fiscal_year_of
 
     result = {
         "site_period": None,
+        "site_fy": None,
         "site_fy_month": None,
         "expected_fy_month": None,
         "check_needed": False,
+        "file_fy": None,
         "file_fy_month": None,
         "file_period_label": None,
         "new_data": False,
     }
 
-    # Step 1: What does the site currently have?
+    # Step 1: What does the site currently have? (obligations FY + period)
     site_label, site_fy = _get_site_latest_period()
     if site_label:
         result["site_period"] = site_label
         result["site_fy_month"] = _label_to_fy_month(site_label)
+    result["site_fy"] = site_fy
+    site_key = (site_fy or 0, result["site_fy_month"] or 0)
 
-    # Step 2: What's the latest month we could expect?
-    today = date.today()
-    # Previous calendar month mapped to FY month (1-month reporting lag)
+    # Step 2: Latest (FY, month) that could be published (1-month reporting lag)
+    today = TODAY
     prev_cal_month = today.month - 1 if today.month > 1 else 12
     prev_cal_year = today.year if today.month > 1 else today.year - 1
-    expected = _calendar_to_fy_month(prev_cal_month, prev_cal_year, CURRENT_FY)
+    expected_fy = fiscal_year_of(date(prev_cal_year, prev_cal_month, 1))
+    expected = _calendar_to_fy_month(prev_cal_month, prev_cal_year, expected_fy)
     result["expected_fy_month"] = expected
 
     # Step 3: Do we need to check?
-    if result["site_fy_month"] is not None and expected is not None:
-        if result["site_fy_month"] >= expected:
-            result["check_needed"] = False
-            return result
-
+    if site_key >= (expected_fy, expected):
+        result["check_needed"] = False
+        return result
     result["check_needed"] = True
 
-    # Step 4: Download current FY files and check
-    print(f"Downloading FY{CURRENT_FY} files to check for new data...")
-    download_all(fiscal_years=[CURRENT_FY], force=True)
+    # Step 4: FYs that could have new data: the site's FY until its final
+    # (September) report, plus any newer FY through the current one.
+    candidates = []
+    if site_fy is None:
+        candidates = [CURRENT_FY]
+    else:
+        if (result["site_fy_month"] or 0) < 12:
+            candidates.append(site_fy)
+        candidates += list(range(site_fy + 1, CURRENT_FY + 1))
 
-    # Step 5: Parse one file to find latest month (use HHS/NIH — largest, most reliable)
-    hhs_path = get_local_path(CURRENT_FY, "hhs")
-    if hhs_path:
-        file_month = _detect_latest_month_in_file(hhs_path)
-        result["file_fy_month"] = file_month
-        if file_month:
+    # Step 5: Download each candidate FY and find its latest populated month
+    # (use HHS/NIH — largest, most reliable)
+    for fy in candidates:
+        if not ensure_registry_entry(fy):
+            continue
+        print(f"Downloading FY{fy} files to check for new data...")
+        download_all(fiscal_years=[fy], force=True)
+        hhs_path = get_local_path(fy, "hhs")
+        file_month = _detect_latest_month_in_file(hhs_path) if hhs_path else None
+        if file_month and (fy, file_month) > (result["file_fy"] or 0, result["file_fy_month"] or 0):
+            result["file_fy"] = fy
+            result["file_fy_month"] = file_month
             result["file_period_label"] = FY_MONTH_LABELS.get(file_month)
 
-        if file_month and result["site_fy_month"]:
-            result["new_data"] = file_month > result["site_fy_month"]
-        elif file_month:
-            result["new_data"] = True
+    if result["file_fy_month"]:
+        result["new_data"] = (result["file_fy"], result["file_fy_month"]) > site_key
 
     return result
 
@@ -267,12 +332,12 @@ if __name__ == "__main__":
         result = check_for_new_data()
         site = result["site_period"] or "unknown"
         print(f"\nSF-133 status:")
-        print(f"  Site currently shows: {site} (FY month {result['site_fy_month']})")
+        print(f"  Site currently shows: FY{result['site_fy']} {site} (FY month {result['site_fy_month']})")
         if not result["check_needed"]:
             print(f"  No check needed — site data is current for this point in the FY.")
         else:
             if result["file_fy_month"]:
-                print(f"  Downloaded file has data through: {result['file_period_label']} (FY month {result['file_fy_month']})")
+                print(f"  Downloaded files have data through: FY{result['file_fy']} {result['file_period_label']} (FY month {result['file_fy_month']})")
                 if result["new_data"]:
                     print(f"  NEW DATA AVAILABLE. Run: python3 data/preprocess.py && python3 build.py")
                 else:

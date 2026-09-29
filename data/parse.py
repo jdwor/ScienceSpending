@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from config import AGENCIES, AMOUNT_COLUMNS, TARGET_LINES
+from config import AGENCIES, AMOUNT_COLUMNS, CURRENT_FY, TARGET_LINES
 
 # Cache parsed Excel DataFrames to avoid re-reading the same file for sub-agencies
 _excel_cache: dict[str, pd.DataFrame] = {}
@@ -210,7 +210,7 @@ def parse_all_files(
 
     for agency_key in agency_keys:
         file_key = AGENCIES[agency_key]["sf133_file_key"]
-        years = fiscal_years if fiscal_years else list(range(2016, 2027))
+        years = fiscal_years if fiscal_years else list(range(2016, CURRENT_FY + 1))
 
         for fy in years:
             path = get_local_path(fy, file_key)

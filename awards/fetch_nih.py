@@ -18,6 +18,7 @@ import requests
 
 from config import (
     CURRENT_FY,
+    is_fy_frozen,
     NIH_COMPETING_TYPES,
     NIH_IC_CODES,
     NIH_REPORTER_MAX_OFFSET,
@@ -46,10 +47,10 @@ def _cache_path(fiscal_year: int, ic: str) -> Path:
 
 
 def _cache_is_fresh(path: Path, fiscal_year: int) -> bool:
-    """Completed FYs are cached forever; current FY expires after 24h."""
+    """Final FYs are cached forever; open FYs (see config.is_fy_frozen) expire after 24h."""
     if not path.exists():
         return False
-    if fiscal_year < CURRENT_FY:
+    if is_fy_frozen(fiscal_year):
         return True
     age = datetime.now() - datetime.fromtimestamp(path.stat().st_mtime)
     return age < timedelta(hours=24)

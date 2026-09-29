@@ -104,12 +104,64 @@ AGENCIES = {
     },
 }
 
-FISCAL_YEARS = list(range(2016, 2027))
-CURRENT_FY = 2026
-# Years drawn as individual lines (not included in the prior-year band)
-HIGHLIGHT_YEARS = [2026, 2025]
-# Years that go into the prior-year range band (excludes current + highlighted)
-BAND_YEARS_EXCLUDE = {2026, 2025}
+# ---------------------------------------------------------------------------
+# Fiscal Year Settings (derived from the date — no manual rollover needed)
+# ---------------------------------------------------------------------------
+# The FY rolls over automatically on October 1. Set SCISPEND_TODAY=YYYY-MM-DD
+# to simulate another date (e.g. to test the rollover before it happens).
+#
+# Two notions of "current FY":
+#   - CURRENT_FY: the FY in progress. Drives the awards pipelines, cache
+#     freshness, and the awards tabs. Flips on October 1.
+#   - Obligations FY: the latest FY with SF-133 data. SF-133 has no October
+#     report, so a new FY's first report (November) posts ~late December.
+#     Until then the obligations tab keeps showing the prior FY. Computed from
+#     the data by data.transform.get_obligations_fy().
+import os as _os
+from datetime import date as _date
+
+
+def fiscal_year_of(d: _date) -> int:
+    """Federal fiscal year containing date d (FY starts October 1)."""
+    return d.year + 1 if d.month >= 10 else d.year
+
+
+_today_override = _os.environ.get("SCISPEND_TODAY")
+TODAY = _date.fromisoformat(_today_override) if _today_override else _date.today()
+
+CURRENT_FY = fiscal_year_of(TODAY)
+FISCAL_YEARS = list(range(2016, CURRENT_FY + 1))
+
+
+def highlight_years(current_fy: int) -> list:
+    """Years drawn as individual lines (not included in the prior-year band)."""
+    return [current_fy, current_fy - 1]
+
+
+def band_years_exclude(current_fy: int) -> set:
+    """Years kept out of the prior-year range band (current + highlighted)."""
+    return {current_fy, current_fy - 1}
+
+
+# Awards-tab values (obligations-tab equivalents are computed from the data)
+HIGHLIGHT_YEARS = highlight_years(CURRENT_FY)
+BAND_YEARS_EXCLUDE = band_years_exclude(CURRENT_FY)
+
+# Prior-FY data keeps arriving after September 30: the final Aug/Sep SF-133
+# reports, NIH Reporter backfill of late-September awards, and USASpending
+# reporting lag. Keep re-fetching the prior FY's caches for this many days
+# into the new FY before treating them as final.
+PRIOR_FY_REFRESH_DAYS = 120
+
+
+def is_fy_frozen(fiscal_year: int) -> bool:
+    """True if cached API data for fiscal_year is final and never re-fetched."""
+    if fiscal_year >= CURRENT_FY:
+        return False
+    if fiscal_year == CURRENT_FY - 1:
+        days_into_fy = (TODAY - _date(CURRENT_FY - 1, 10, 1)).days
+        return days_into_fy >= PRIOR_FY_REFRESH_DAYS
+    return True
 
 # ---------------------------------------------------------------------------
 # Sub-Agency Mappings
@@ -240,7 +292,7 @@ for _ic, _tracct in NIH_IC_TRACCTS.items():
 # Awards Pipeline
 # ---------------------------------------------------------------------------
 
-AWARDS_FISCAL_YEARS = list(range(2016, 2027))
+AWARDS_FISCAL_YEARS = list(range(2016, CURRENT_FY + 1))
 
 # NIH Reporter API
 NIH_REPORTER_URL = "https://api.reporter.nih.gov/v2/projects/search"
@@ -259,7 +311,7 @@ NIH_ALL_TYPES = ["1", "2", "3", "4", "5", "7", "9"]
 # FY2016 Type 5 data from NIH Reporter is significantly lower than USASpending
 # figures for the same year (~$16.5B vs ~$23.5B), unlike FY2017+ which align
 # closely, suggesting a data integrity issue in the earlier Reporter records.
-NIH_ALL_AWARDS_FISCAL_YEARS = list(range(2017, 2027))
+NIH_ALL_AWARDS_FISCAL_YEARS = list(range(2017, CURRENT_FY + 1))
 
 # NIH IC abbreviations — used to partition queries and stay under API limits
 NIH_IC_CODES = [

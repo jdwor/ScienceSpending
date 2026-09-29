@@ -15,6 +15,13 @@
     const PRIOR_RANGE_COLOR = "rgba(160, 175, 200, 0.15)";
     const HIGHLIGHT_COLORS = { 2025: "#94a3b8" };
 
+    // Awards views roll over to the new FY on Oct 1, but obligations views keep
+    // the prior FY until its first SF-133 report posts (~late December), so
+    // config.current_fy (obligations) and config.awards_current_fy can differ.
+    // Fall back to current_fy for site_data.json built before the split.
+    function awardsFy(cfg) { return cfg.awards_current_fy || cfg.current_fy; }
+    function awardsHighlightYears(cfg) { return cfg.awards_highlight_years || cfg.highlight_years || []; }
+
     // ── Source type display names ──
     const SOURCE_LABELS = {
         nih_reporter: 'NIH Reporter',
@@ -209,6 +216,22 @@
     }
 
     // ── Data Badge ──
+
+    // Fill FY years in methodology text (<span data-fy="...">) so the copy
+    // rolls over with the data. Historical bands exclude the current and prior FY.
+    function fillFyText() {
+        const cfg = DATA.config;
+        const values = {
+            'oblig-band-end': cfg.current_fy - 2,
+            'awards-band-end': awardsFy(cfg) - 2,
+            'awards-prior': awardsFy(cfg) - 1,
+            'awards-current': awardsFy(cfg),
+        };
+        document.querySelectorAll('[data-fy]').forEach(function (el) {
+            const v = values[el.getAttribute('data-fy')];
+            if (v) el.textContent = v;
+        });
+    }
 
     function renderDataBadge() {
         const badge = document.getElementById('data-badge');
@@ -471,13 +494,19 @@
             html += '<div class="overview-shared-legend">';
             html += '<span class="legend-item"><span class="legend-swatch legend-band"></span>Historical range</span>';
             html += '<span class="legend-item"><span class="legend-swatch legend-avg"></span>Historical avg.</span>';
-            var hlYears = (cfg.highlight_years || []).sort();
-            for (var hi = 0; hi < hlYears.length; hi++) {
-                if (hlYears[hi] !== cfg.current_fy) {
-                    html += '<span class="legend-item"><span class="legend-line" style="background:' + (HIGHLIGHT_COLORS[hlYears[hi]] || '#94a3b8') + '"></span>FY ' + hlYears[hi] + '</span>';
+            if (awardsFy(cfg) === cfg.current_fy) {
+                var hlYears = (cfg.highlight_years || []).sort();
+                for (var hi = 0; hi < hlYears.length; hi++) {
+                    if (hlYears[hi] !== cfg.current_fy) {
+                        html += '<span class="legend-item"><span class="legend-line" style="background:' + (HIGHLIGHT_COLORS[hlYears[hi]] || '#94a3b8') + '"></span>FY ' + hlYears[hi] + '</span>';
+                    }
                 }
+                html += '<span class="legend-item"><span class="legend-line" style="border-top-color:' + agency.color + ';border-top-width:2.5px"></span>FY ' + cfg.current_fy + '</span>';
+            } else {
+                // Rollover period: awards charts show the new FY, obligations the prior one
+                html += '<span class="legend-item"><span class="legend-line" style="background:#94a3b8"></span>Prior FY</span>';
+                html += '<span class="legend-item"><span class="legend-line" style="border-top-color:' + agency.color + ';border-top-width:2.5px"></span>Current FY (awards: FY ' + awardsFy(cfg) + '; obligations: FY ' + cfg.current_fy + ')</span>';
             }
-            html += '<span class="legend-item"><span class="legend-line" style="border-top-color:' + agency.color + ';border-top-width:2.5px"></span>FY ' + cfg.current_fy + '</span>';
             html += '</div>';
             html += '</div></div>';
 
@@ -1530,7 +1559,7 @@
 
         const ticks = awardTickArrays();
         const traces = [];
-        const currentFy = cfg.current_fy;
+        const currentFy = awardsFy(cfg);
 
         // 0% "on pace" reference line — spans full FY (Oct 1 = day 1 to Sep 30 = day 365)
         traces.push({
@@ -1762,7 +1791,7 @@
         // Convert fy_day x-data to reference dates via fyDayToRefDate() so the
         // Plotly date axis formats hover headers as month names automatically.
         const traces = [];
-        const currentFy = cfg.current_fy;
+        const currentFy = awardsFy(cfg);
 
         const yCol = mode === 'counts' ? 'cumulative_count'
                    : mode === 'dollars' ? 'cumulative_dollars_m'
@@ -1832,7 +1861,7 @@
         const isDaily = agencyAwards.source_type !== 'usaspending';
 
         // Highlighted prior years
-        const highlightYears = cfg.highlight_years || [];
+        const highlightYears = awardsHighlightYears(cfg);
         for (const fy of highlightYears.sort()) {
             if (fy === currentFy) continue;
             const yearData = agencyAwards.years[String(fy)];
@@ -2183,7 +2212,7 @@
         // To re-enable, uncomment: document.getElementById('tab-btn-unified').style.display = '';
 
         var cfg = DATA.config;
-        var currentFy = cfg.current_fy;
+        var currentFy = awardsFy(cfg);
 
         // Populate agency select
         var select = document.getElementById('unified-agency-select');
@@ -2222,7 +2251,7 @@
 
         var ticks = awardTickArrays();
         var traces = [];
-        var currentFy = cfg.current_fy;
+        var currentFy = awardsFy(cfg);
 
         traces.push({
             x: [1, 365], y: [0, 0],
@@ -2359,7 +2388,7 @@
         var agencyAwards = unified[agencyKey];
         var agencyCfg = cfg.agencies[agencyKey];
         var traces = [];
-        var currentFy = cfg.current_fy;
+        var currentFy = awardsFy(cfg);
         var isPct = mode === 'pct';
         var isDollars = mode === 'dollars';
         var yCol = isPct ? 'pct_of_approp' : 'cumulative_dollars_m';
@@ -2399,7 +2428,7 @@
         }
 
         var hoverFmt = isPct ? '%{y:.2f}% of approp' : '$%{y:,.0f}M awarded';
-        var highlightYears = cfg.highlight_years || [];
+        var highlightYears = awardsHighlightYears(cfg);
         for (var hi = 0; hi < highlightYears.length; hi++) {
             var fy = highlightYears[hi];
             if (fy === currentFy) continue;
@@ -2522,7 +2551,7 @@
             yoyStr = (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'pp (' + (rel >= 0 ? '+' : '') + rel.toFixed(1) + '%)';
             yoyDir = diff < 0 ? 'negative' : 'positive';
         }
-        html += card('vs. FY' + (cfg.current_fy - 1), yoyStr, null, yoyDir);
+        html += card('vs. FY' + (awardsFy(cfg) - 1), yoyStr, null, yoyDir);
 
         var medStr = 'N/A', medDir = '';
         if (summ.cumul_pct_approp != null && summ.mean_pct_approp != null) {
@@ -2551,7 +2580,7 @@
 
         // Set multi-agency chart title
         var titleEl = document.getElementById('awards-all-multi-title');
-        if (titleEl) titleEl.textContent = 'FY' + DATA.config.current_fy + ' Award-Making Pace vs. Historical Average';
+        if (titleEl) titleEl.textContent = 'FY' + awardsFy(DATA.config) + ' Award-Making Pace vs. Historical Average';
 
         // Populate agency select
         var select = document.getElementById('awards-all-agency-select');
@@ -2683,6 +2712,7 @@
         initExport();
         initAwardsExport();
         renderDataBadge();
+        fillFyText();
         // Show tab buttons for tabs that have data
         if (DATA.awards_all) {
             var aab = document.getElementById('tab-btn-awards-all');

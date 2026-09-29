@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Weekly sciencespending.org data update (Mondays 7:00 AM; runs at next wake if asleep).
+  Install:  cp scripts/org.sciencespending.update.plist ~/Library/LaunchAgents/
+            launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.sciencespending.update.plist
+  See UPDATE.md > Automated Weekly Updates.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.sciencespending.update</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/jordandworkin/ScienceSpending-auto/scripts/auto_update.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/jordandworkin/Library/Logs/sciencespending/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jordandworkin/Library/Logs/sciencespending/launchd.log</string>
+</dict>
+</plist>

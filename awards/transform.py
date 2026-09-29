@@ -13,7 +13,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from config import AWARDS_CONFIG, BAND_YEARS_EXCLUDE, CURRENT_FY
+from config import AWARDS_CONFIG, BAND_YEARS_EXCLUDE, CURRENT_FY, TODAY
 
 
 def _fy_day(d: date, fiscal_year: int) -> int:
@@ -240,7 +240,35 @@ def build_award_series(
     if not frames:
         return pd.DataFrame()
 
-    return pd.concat(frames, ignore_index=True)
+    return _add_empty_current_fy(pd.concat(frames, ignore_index=True))
+
+
+def _add_empty_current_fy(series: pd.DataFrame) -> pd.DataFrame:
+    """Give agencies with no current-FY awards yet a single zero point.
+
+    In the first days of a new FY (or during a shutdown) an agency can have no
+    awards at all, which would otherwise drop it from the summary and charts
+    entirely. The zero point sits at yesterday — the latest day the data covers.
+    """
+    fy_start = date(CURRENT_FY - 1, 10, 1)
+    as_of = max(TODAY - timedelta(days=1), fy_start)
+    stubs = []
+    for agency_key, agency_data in series.groupby("agency"):
+        if (agency_data["fiscal_year"] == CURRENT_FY).any():
+            continue
+        stubs.append({
+            "agency": agency_key,
+            "fiscal_year": CURRENT_FY,
+            "date": as_of.isoformat(),
+            "fy_day": _fy_day(as_of, CURRENT_FY),
+            "cumulative_count": 0,
+            "cumulative_dollars": 0.0,
+            "source_type": AWARDS_CONFIG[agency_key]["source"],
+            "is_provisional": False,
+        })
+    if not stubs:
+        return series
+    return pd.concat([series, pd.DataFrame(stubs)], ignore_index=True)
 
 
 def build_award_summary(
