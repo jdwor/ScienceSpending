@@ -32,16 +32,17 @@ main() {
     echo "=== sciencespending auto-update $(date) (dry_run=$dry_run) ==="
 
     # One run at a time (stale locks from crashed runs expire after 6h)
-    local lock="$log_dir/.lock"
-    if ! mkdir "$lock" 2>/dev/null; then
-        if [ -n "$(find "$lock" -maxdepth 0 -mmin +360)" ]; then
-            rm -rf "$lock" && mkdir "$lock"
+    # (global, not local: the EXIT trap runs after main() returns)
+    SCISPEND_LOCK="$log_dir/.lock"
+    if ! mkdir "$SCISPEND_LOCK" 2>/dev/null; then
+        if [ -n "$(find "$SCISPEND_LOCK" -maxdepth 0 -mmin +360)" ]; then
+            rm -rf "$SCISPEND_LOCK" && mkdir "$SCISPEND_LOCK"
         else
             echo "Another run is in progress; exiting."
             return 0
         fi
     fi
-    trap 'rm -rf "$lock"' EXIT
+    trap 'rm -rf "$SCISPEND_LOCK"' EXIT
 
     # Keep the Mac awake while this runs (it sleeps after 1 min idle)
     caffeinate -i -s -w $$ &
