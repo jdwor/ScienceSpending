@@ -51,9 +51,11 @@ Follow `UPDATE.md` for the complete step-by-step update workflow, including:
 `data update` commits to main. `git pull` before working here. Logs:
 `~/Library/Logs/sciencespending/STATUS.txt`.
 
-**Rollover:** awards views switch to the new FY on Oct 1; obligations views
-switch when the new FY's first SF-133 report exists (~late Dec). Test any date
-with `SCISPEND_TODAY=YYYY-MM-DD`. Never hardcode fiscal years.
+**Rollover:** the site keeps displaying the prior FY until the new FY's first
+SF-133 report exists (~late Dec), then all tabs switch together (`display_fy` in
+`build.py`). New-FY data is fetched from Oct 1 but not shown — early-FY
+percentages vs. near-zero historical averages are noise. Test any date with
+`SCISPEND_TODAY=YYYY-MM-DD`. Never hardcode fiscal years.
 
 ## Critical: NSF Dollar Extraction (New Awards Tab)
 

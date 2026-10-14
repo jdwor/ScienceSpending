@@ -155,13 +155,17 @@ is derived from the date, and the FY ranges, highlight years, and historical-ban
 years all follow from it. Set `SCISPEND_TODAY=YYYY-MM-DD` to simulate another date
 (e.g. `SCISPEND_TODAY=2026-10-05 python3 build.py`).
 
-The obligations and awards views roll over at different times, because SF-133 has
-no October report:
+The site keeps showing the prior FY until the new FY has meaningful data, then all
+tabs switch together:
 
-| When | Awards tabs | Obligations tab |
-|------|-------------|-----------------|
-| Oct 1 | Switch to the new FY (starts at $0 with a zero point "as of yesterday") | Stay on the prior FY, which keeps filling in (Aug, then final Sep report) |
-| ~Late Dec (first SF-133 report, November) | — | Switch to the new FY (`data.transform.get_obligations_fy` = latest FY with SF-133 data) |
+| When | What happens |
+|------|--------------|
+| Oct 1 | `CURRENT_FY` advances: new-FY awards start being fetched, but are **not shown**. The site keeps showing the prior FY's completed year, which keeps filling in (final Aug/Sep SF-133 reports, award backfill). |
+| ~Late Dec (first SF-133 report of the new FY, for November) | The displayed FY switches to the new FY on every tab (`display_fy` in `build.py` = `data.transform.get_obligations_fy`, the latest FY with SF-133 data). |
+
+Why wait: in the first weeks of a FY, "% of historical average" compares a few awards
+against near-zero averages (e.g. +300% / −100%), which is noise. By late December
+there are ~2.5 months of data.
 
 What handles each piece:
 
@@ -172,10 +176,10 @@ What handles each piece:
   SF-133 reports, NIH Reporter backfill, and USASpending lag are captured.
 - **Appropriation denominator:** until the new FY's first SF-133 report exists, the
   awards views use the prior FY's appropriation (≈ the CR rate) for "% of appropriation".
-- **Frontend:** `config.current_fy` / `highlight_years` / `band_years_exclude` in
-  `site_data.json` describe the obligations views; `awards_current_fy` /
-  `awards_highlight_years` / `awards_band_years_exclude` describe the awards views.
-  Methodology FY ranges are filled in from the data (`fillFyText` in `app.js`).
+- **Frontend:** `config.current_fy` / `highlight_years` / `band_years_exclude` and the
+  `awards_*` equivalents in `site_data.json` are both set to the displayed FY (the
+  frontend still supports them differing). Methodology FY ranges are filled in from
+  the data (`fillFyText` in `app.js`).
 
 **Verify after each rollover stage:** the new FY appears as the highlighted line,
 the prior FY moves to gray, and the band gains the prior-prior year.

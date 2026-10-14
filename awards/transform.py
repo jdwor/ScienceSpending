@@ -13,7 +13,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from config import AWARDS_CONFIG, BAND_YEARS_EXCLUDE, CURRENT_FY, TODAY
+from config import AWARDS_CONFIG, CURRENT_FY, TODAY, band_years_exclude
 
 
 def _fy_day(d: date, fiscal_year: int) -> int:
@@ -299,9 +299,9 @@ def build_award_summary(
             prior_dollars = float(np.interp(latest_day, prior["fy_day"].values, prior["cumulative_dollars"].values))
             prior_count = int(np.interp(latest_day, prior["fy_day"].values, prior["cumulative_count"].values))
 
-        # Mean of all prior years (excluding BAND_YEARS_EXCLUDE) at same day
+        # Mean of all prior years (excluding the band exclusions) at same day
         band_years = agency_data[
-            (~agency_data["fiscal_year"].isin(BAND_YEARS_EXCLUDE))
+            (~agency_data["fiscal_year"].isin(band_years_exclude(current_fy)))
             & (agency_data["fiscal_year"] < current_fy)
         ]
         mean_counts = []

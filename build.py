@@ -17,10 +17,11 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import (
-    AGENCIES, AWARDS_CONFIG, CURRENT_FY, HIGHLIGHT_YEARS,
-    BAND_YEARS_EXCLUDE, FY_MONTH_LABELS, highlight_years, band_years_exclude,
+    AGENCIES, AWARDS_CONFIG, CURRENT_FY, FY_MONTH_LABELS,
+    highlight_years, band_years_exclude,
 )
 from data.transform import get_obligations_fy
+from awards.transform import build_award_summary
 
 PROCESSED_DIR = Path(__file__).resolve().parent / "data" / "processed"
 AWARDS_PROCESSED_DIR = Path(__file__).resolve().parent / "awards" / "processed"
@@ -278,7 +279,7 @@ def build_data_tables(approp_summary, yoy_comparison):
     return {"approp_summary": approp_records, "yoy_comparison": yoy_records}
 
 
-def _load_approp_lookup():
+def _load_approp_lookup(display_fy):
     """Build {agency: {fy: approp_dollars}} from SF-133 approp_summary.
 
     Sub-agencies without their own appropriation data fall back to their
@@ -303,8 +304,8 @@ def _load_approp_lookup():
     # as the denominator — a continuing resolution funds agencies at roughly
     # the prior-year rate, which is also what SF-133 line 1100 reports.
     for by_fy in lookup.values():
-        if CURRENT_FY not in by_fy and (CURRENT_FY - 1) in by_fy:
-            by_fy[CURRENT_FY] = by_fy[CURRENT_FY - 1]
+        if display_fy not in by_fy and (display_fy - 1) in by_fy:
+            by_fy[display_fy] = by_fy[display_fy - 1]
     # Fall back to parent appropriation for sub-agencies without their own
     for key, cfg in AGENCIES.items():
         if key not in lookup and "parent" in cfg and cfg["parent"] in lookup:
@@ -336,13 +337,17 @@ def _detect_reliable_years(agency_series, fiscal_years, current_fy):
     return [
         fy for fy in fiscal_years
         if fy == current_fy
-        or fy in HIGHLIGHT_YEARS
+        or fy in highlight_years(current_fy)
         or fy_totals.get(fy, 0) >= threshold
     ]
 
 
-def build_awards_site_data(series_override=None, summary_override=None):
-    """Build awards chart data from awards/processed/ CSVs if available."""
+def build_awards_site_data(display_fy, series_override=None, summary_override=None):
+    """Build awards chart data from awards/processed/ CSVs if available.
+
+    display_fy is the FY shown as current. It can lag CURRENT_FY: data for a
+    newer FY is fetched but not shown until the site switches to it.
+    """
     series_path = series_override or (AWARDS_PROCESSED_DIR / "award_series.csv")
     summary_path = summary_override or (AWARDS_PROCESSED_DIR / "award_summary.csv")
 
@@ -352,8 +357,15 @@ def build_awards_site_data(series_override=None, summary_override=None):
 
     print(f"Loading awards CSVs from {Path(series_path).name}...")
     series = pd.read_csv(series_path)
-    summary_df = pd.read_csv(summary_path) if Path(summary_path).exists() else pd.DataFrame()
-    approp_lookup = _load_approp_lookup()
+    # Hide FYs newer than the displayed one (fetched, but not shown yet)
+    series = series[series["fiscal_year"] <= display_fy]
+    if display_fy == CURRENT_FY:
+        summary_df = pd.read_csv(summary_path) if Path(summary_path).exists() else pd.DataFrame()
+    else:
+        # The preprocessed summary describes CURRENT_FY; recompute for display_fy
+        summary_df = build_award_summary(series, current_fy=display_fy)
+    approp_lookup = _load_approp_lookup(display_fy)
+    band_exclude = band_years_exclude(display_fy)
 
     awards_data = {}
     for agency_key in AWARDS_CONFIG:
@@ -365,13 +377,13 @@ def build_awards_site_data(series_override=None, summary_override=None):
         fiscal_years = sorted(agency_series["fiscal_year"].unique())
 
         # Auto-exclude years with bad data
-        reliable_years = _detect_reliable_years(agency_series, fiscal_years, CURRENT_FY)
+        reliable_years = _detect_reliable_years(agency_series, fiscal_years, display_fy)
         excluded_years = [fy for fy in fiscal_years if fy not in reliable_years]
         if excluded_years:
             print(f"  {agency_key}: excluding {excluded_years} (incomplete USASpending data)")
 
         band_fys = [fy for fy in reliable_years
-                    if fy not in BAND_YEARS_EXCLUDE and fy != CURRENT_FY]
+                    if fy not in band_exclude and fy != display_fy]
 
         # Get appropriation lookup for this agency
         agency_approp = approp_lookup.get(agency_key, {})
@@ -494,7 +506,7 @@ def build_awards_site_data(series_override=None, summary_override=None):
 
             # Add appropriation for context
             agency_approp = approp_lookup.get(agency, {})
-            approp_val = agency_approp.get(CURRENT_FY)
+            approp_val = agency_approp.get(display_fy)
             if approp_val:
                 rec["appropriation"] = round(approp_val, 2)
 
@@ -509,7 +521,7 @@ def build_awards_site_data(series_override=None, summary_override=None):
                 rec["cumul_pct_approp"] = None
 
             # Prior FY: prior year $ at same day as % of prior year appropriation
-            prior_approp = agency_approp.get(CURRENT_FY - 1)
+            prior_approp = agency_approp.get(display_fy - 1)
             prior_dollars = rec.get("prior_year_dollars")
             if prior_approp and prior_approp > 0 and prior_dollars is not None:
                 rec["prior_year_pct_approp"] = round(prior_dollars / prior_approp * 100, 3)
@@ -523,11 +535,11 @@ def build_awards_site_data(series_override=None, summary_override=None):
             reliable = _detect_reliable_years(
                 agency_series_for_mean,
                 sorted(agency_series_for_mean["fiscal_year"].unique()),
-                CURRENT_FY,
+                display_fy,
             )
             band = [
                 fy for fy in reliable
-                if fy not in BAND_YEARS_EXCLUDE and fy != CURRENT_FY
+                if fy not in band_exclude and fy != display_fy
             ]
             pct_vals = []
             dollar_vals = []
@@ -566,7 +578,7 @@ def build_awards_site_data(series_override=None, summary_override=None):
     # When a sub-agency (e.g. NIMHD) has prior-year data but no current-FY
     # awards yet, the chart shows no FY line and the metrics table disappears.
     # Fix: mirror the parent's current-FY date structure with zero values.
-    fy_key = str(CURRENT_FY)
+    fy_key = str(display_fy)
     for agency_key, adata in awards_data.items():
         if fy_key in adata["years"]:
             continue
@@ -585,15 +597,15 @@ def build_awards_site_data(series_override=None, summary_override=None):
             "cumulative_dollars_m": [0.0] * n,
             "pct_of_approp": [0.0] * n,
         }
-        if CURRENT_FY not in adata["fiscal_years"]:
-            adata["fiscal_years"].append(CURRENT_FY)
+        if display_fy not in adata["fiscal_years"]:
+            adata["fiscal_years"].append(display_fy)
 
         # Also fill in a zero summary so the metrics table renders
         if agency_key not in awards_summary:
             parent_summ = awards_summary.get(parent_key)
             if parent_summ:
                 agency_approp_lookup = approp_lookup.get(agency_key, {})
-                approp_val = agency_approp_lookup.get(CURRENT_FY)
+                approp_val = agency_approp_lookup.get(display_fy)
                 awards_summary[agency_key] = {
                     "agency": agency_key,
                     "source_type": adata["source_type"],
@@ -619,14 +631,14 @@ def build_awards_site_data(series_override=None, summary_override=None):
                     reliable = _detect_reliable_years(
                         agency_series_sub,
                         sorted(agency_series_sub["fiscal_year"].unique()),
-                        CURRENT_FY,
+                        display_fy,
                     )
                     band = [fy for fy in reliable
-                            if fy not in BAND_YEARS_EXCLUDE and fy != CURRENT_FY]
+                            if fy not in band_exclude and fy != display_fy]
                     pct_vals, dollar_vals, count_vals = [], [], []
                     prior_dollars = prior_count = None
                     for fy in sorted(reliable):
-                        if fy == CURRENT_FY:
+                        if fy == display_fy:
                             continue
                         fy_data = agency_series_sub[
                             agency_series_sub["fiscal_year"] == fy
@@ -636,7 +648,7 @@ def build_awards_site_data(series_override=None, summary_override=None):
                         days = fy_data["fy_day"].values
                         dollars = fy_data["cumulative_dollars"].values
                         interp_d = float(np.interp(latest_day, days, dollars))
-                        if fy == CURRENT_FY - 1:
+                        if fy == display_fy - 1:
                             prior_dollars = interp_d
                             if "cumulative_count" in fy_data.columns:
                                 prior_count = float(np.interp(
@@ -656,7 +668,7 @@ def build_awards_site_data(series_override=None, summary_override=None):
                     rec["prior_year_dollars"] = round(prior_dollars, 2) if prior_dollars is not None else None
                     rec["prior_year_count"] = round(prior_count, 2) if prior_count is not None else None
                     if prior_dollars is not None:
-                        prior_approp = agency_approp_lookup.get(CURRENT_FY - 1)
+                        prior_approp = agency_approp_lookup.get(display_fy - 1)
                         if prior_approp and prior_approp > 0:
                             rec["prior_year_pct_approp"] = round(prior_dollars / prior_approp * 100, 3)
                     if pct_vals:
@@ -733,10 +745,13 @@ def main():
     print("Loading preprocessed CSVs...")
     obligation_series, approp_summary, yoy_comparison = load_csvs()
 
-    # The obligations views lag CURRENT_FY until the new FY's first SF-133
-    # report exists (~late December); the awards views use CURRENT_FY.
+    # The site keeps showing the prior FY until the new FY's first SF-133
+    # report exists (~late December) — early-FY percentages are noise against
+    # near-zero historical averages. Awards and obligations switch together.
+    # (CURRENT_FY data is still fetched in the meantime.)
     obligations_fy = get_obligations_fy(obligation_series)
-    print(f"Obligations FY: {obligations_fy} | Awards FY: {CURRENT_FY}")
+    display_fy = obligations_fy
+    print(f"Displayed FY: {display_fy} (in progress: FY{CURRENT_FY})")
 
     # Derive latest period label from obligation_series for the obligations FY
     current_fy_data = obligation_series[obligation_series["fiscal_year"] == obligations_fy]
@@ -747,7 +762,7 @@ def main():
         latest_period_label = None
 
     # Load awards data if available
-    awards_data, awards_summary_data = build_awards_site_data()
+    awards_data, awards_summary_data = build_awards_site_data(display_fy)
 
     print("Building chart data...")
     site_data = {
@@ -758,9 +773,9 @@ def main():
             "current_fy": obligations_fy,
             "highlight_years": highlight_years(obligations_fy),
             "band_years_exclude": sorted(band_years_exclude(obligations_fy)),
-            "awards_current_fy": CURRENT_FY,
-            "awards_highlight_years": HIGHLIGHT_YEARS,
-            "awards_band_years_exclude": sorted(BAND_YEARS_EXCLUDE),
+            "awards_current_fy": display_fy,
+            "awards_highlight_years": highlight_years(display_fy),
+            "awards_band_years_exclude": sorted(band_years_exclude(display_fy)),
             "fy_month_labels": FY_MONTH_LABELS,
             "build_date": datetime.date.today().isoformat(),
             "latest_period_label": latest_period_label,
@@ -788,6 +803,7 @@ def main():
             _acfg[k] = {**_acfg[k], "source": "usaspending"}
         try:
             unified_data, unified_summary = build_awards_site_data(
+                display_fy,
                 series_override=unified_series_path,
                 summary_override=AWARDS_PROCESSED_DIR / "award_summary_unified.csv",
             )
@@ -814,6 +830,7 @@ def main():
                 _acfg_aa[k] = {**_acfg_aa[k], **_aacfg[k], "source": _src}
         try:
             all_awards_data, all_awards_summary = build_awards_site_data(
+                display_fy,
                 series_override=all_awards_series_path,
                 summary_override=AWARDS_PROCESSED_DIR / "award_summary_all.csv",
             )

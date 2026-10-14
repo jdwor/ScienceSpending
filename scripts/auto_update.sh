@@ -62,7 +62,7 @@ main() {
         for ((i = 1; i <= n; i++)); do
             "$@" && return 0
             echo "  attempt $i/$n failed: $*"
-            [ "$i" -lt "$n" ] && sleep 300
+            [ "$i" -lt "$n" ] && sleep 600
         done
         return 1
     }
@@ -75,8 +75,10 @@ main() {
     echo "HEAD: $(git log --oneline -1)"
 
     echo "--- Step 1: awards"
-    retry 2 $py -m awards.preprocess || fail "awards.preprocess failed"
-    retry 2 $py -m awards.preprocess_all || fail "awards.preprocess_all failed"
+    # NIH Reporter read timeouts are common; caches keep partial progress,
+    # so each retry resumes where the last attempt stopped
+    retry 4 $py -m awards.preprocess || fail "awards.preprocess failed"
+    retry 4 $py -m awards.preprocess_all || fail "awards.preprocess_all failed"
 
     echo "--- Step 2: SF-133 obligations"
     local check
